@@ -1,0 +1,54 @@
+# KyroOS Project State
+# Version: KyroOS 26.01 "Helium" alpha (dev branch)
+#
+# Single source of truth for project state, progress, and architecture.
+# DO NOT MODIFY MANUALLY.
+
+---
+## chariot: Execution Contract
+- The project is LONG-RUN and ITERATIVE.
+- KyroOS specifications are FINAL and immutable.
+- Implement step-by-step with REAL, COMPILABLE CODE.
+- No pseudo-code, no TODOs, no placeholders.
+- Explanations must be minimal and technical.
+- This file must be updated and presented at the start of every response.
+---
+
+## 📜 Task Queue
+
+### ✅ COMPLETED
+- **STEP 1:** Foundational build and boot environment.
+- **STEP 2:** Core interrupt and exception handling infrastructure.
+- **BUILD INSTRUCTIONS:** Creation of the official build and run documentation.
+- **STEP 3:** Physical and Virtual Memory Management (Paging, Heap).
+- **STEP 4:** Scheduler and Threads.
+- **STEP 5:** Syscall Interface.
+- **STEP 6:** Virtual File System (VFS) and KyroFS.
+- **STEP 7:** Device Driver Framework.
+- **STEP 8:** Networking Stack (TCP/IP, Zero-Copy).
+- **STEP 9:** Graphics Stack (Framebuffer GUI, WM).
+- **STEP 10:** Audio Stack.
+
+### 🔄 IN PROGRESS: STEP 11
+- **Description:** Userspace and Shell.
+- **Sub-Task:** Implement ELF loader and GDT/TSS for user mode.
+
+### ⏳ PENDING
+- **STEP 11 (Sub-Task 11.2):** Build system for userspace program, Multiboot module loading, and `enter_userspace()` function.
+- **STEP 12:** Package Manager
+- **STEP 13:** Security, Module Signing
+- **STEP 14:** Gaming Layer (SDL-like API)
+- **STEP 15:** Final Documentation and Polish
+---
+
+## 🏛️ Architecture & Invariants (from original spec)
+- **OS Name:** KyroOS
+- **Architecture:** x86_64
+- **Kernel:** Monolithic + LKMs
+- **Language:** C
+- **Boot:** GRUB-compatible (multiboot2)
+- **Filesystem:** KyroFS (primary), ext2/4 (support)
+- **Userspace:** Custom init, custom shell (Lua scripted)
+- **Graphics:** Framebuffer, software rendering, custom WM
+- **ABI:** ELF64
+- **Build:** Makefile, GCC cross-compiler
