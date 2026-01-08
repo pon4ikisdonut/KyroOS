@@ -3,45 +3,42 @@
 
 #include "gdt.h"
 #include "idt.h"
-#include "isr.h"
 #include "log.h"
-#include "port_io.h"
 #include "pmm.h"
 #include "vmm.h"
 #include "heap.h"
-#include "thread.h"
-#include "scheduler.h"
+#include "tss.h"
+#include "elf.h"
+#include "userspace.h"
 #include "syscall.h"
-#include "vfs.h"
-#include "kyrofs.h"
-#include "deviceman.h"
-#include "pci.h"
-#include "null_pci_driver.h"
-#include "net.h"
-#include "e1000.h"
-#include "arp.h"
-#include "ip.h"
-#include "icmp.h"
+#include "multiboot2.h"
 #include "fb.h"
-#include "gui.h"
+#include "event.h"
+#include "keyboard.h"
 #include "mouse.h"
-#include "audio.h"
-#include "ac97.h"
-#include "math.h" // Our own math header
 
-#define PI 3.1415926535
-
-void timer_handler(struct registers regs) {
-    // Empty for now
+// Helper function to find a multiboot module tag by its command line string
+static struct multiboot_tag_module* find_module_tag(uint32_t info_addr, const char* name) {
+    struct multiboot_tag* tag;
+    for (tag = (struct multiboot_tag*)(uint64_t)(info_addr + 8);
+         tag->type != MULTIBOOT_TAG_TYPE_END;
+         tag = (struct multiboot_tag*)((uint8_t*)tag + ((tag->size + 7) & ~7))) {
+        if (tag->type == MULTIBOOT_TAG_TYPE_MODULE) {
+            struct multiboot_tag_module* mod_tag = (struct multiboot_tag_module*)tag;
+            const char* mod_name = (const char*)mod_tag->cmdline;
+            
+            int i = 0;
+            while (name[i] != '\0' && mod_name[i] != '\0' && name[i] == mod_name[i]) {
+                i++;
+            }
+            if (name[i] == '\0' && mod_name[i] == '\0') {
+                return mod_tag;
+            }
+        }
+    }
+    return NULL;
 }
 
-void init_timer(uint32_t frequency) {
-    register_irq_handler(0, timer_handler);
-    uint32_t divisor = 1193180 / frequency;
-    outb(0x43, 0x36);
-    outb(0x40, divisor & 0xFF);
-    outb(0x40, (divisor >> 8) & 0xFF);
-}
 
 void kmain_x64(uint32_t multiboot_magic, uint32_t multiboot_info_addr) {
     
@@ -57,56 +54,43 @@ void kmain_x64(uint32_t multiboot_magic, uint32_t multiboot_info_addr) {
         return;
     }
 
-    // Initialize core systems
+    // Initialize core kernel systems
     gdt_init();
+    tss_init();
     idt_init();
     pmm_init(multiboot_info_addr);
     vmm_init();
     heap_init();
-    thread_init();
     syscall_init();
-    vfs_init();
-    kyrofs_init();
+    event_init();
+    keyboard_init();
+    mouse_init();
     
-    // Initialize Device Driver Framework, Networking, and Audio
-    deviceman_init();
-    null_pci_driver_init();
-    net_init();
-    e1000_driver_init();
-    arp_init();
-    ip_init();
-    icmp_init();
-    audio_init();
-    ac97_driver_init();
-    
-    pci_check_all_buses();
-    deviceman_probe_devices();
-
-    // Start timer and interrupts
-    init_timer(100);
-    enable_interrupts();
-    klog(LOG_INFO, "Interrupts enabled. Kernel setup complete.");
-    
-    // Test Audio
-    klog(LOG_INFO, "Audio Test: Generating a 440Hz sine wave...");
-    size_t sample_rate = 48000;
-    size_t duration = 2; // seconds
-    size_t num_samples = sample_rate * duration;
-    int16_t* audio_buffer = (int16_t*)kmalloc(num_samples * sizeof(int16_t));
-    if (audio_buffer) {
-        for (size_t i = 0; i < num_samples; i++) {
-            double time = (double)i / sample_rate;
-            // A simple sine wave at 440 Hz (A4 note)
-            audio_buffer[i] = (int16_t)(32760.0 * sin(2 * PI * 440.0 * time));
-        }
-        klog(LOG_INFO, "Playing sound...");
-        audio_play(audio_buffer, num_samples * sizeof(int16_t));
-        kfree(audio_buffer);
-    } else {
-        klog(LOG_ERROR, "Failed to allocate audio buffer.");
+    // Find the game program module
+    struct multiboot_tag_module* game_module = find_module_tag(multiboot_info_addr, "/boot/game.elf");
+    if (!game_module) {
+        panic("Could not find game.elf module!", NULL);
+        return;
     }
+    klog(LOG_INFO, "Found game.elf module.");
 
-    // Idle loop
+    // Load the game program
+    uint64_t entry_point = elf_load((const uint8_t*)((uint64_t)game_module->mod_start));
+
+    if (entry_point == 0) {
+        panic("Failed to load game.elf!", NULL);
+        return;
+    }
+    
+    // Enable interrupts before jumping to userspace
+    enable_interrupts();
+    klog(LOG_INFO, "Interrupts enabled.");
+
+    // Enter userspace
+    enter_userspace(entry_point);
+
+    // We should never get here
+    klog(LOG_ERROR, "Failed to enter userspace.");
     for (;;) {
         asm volatile ("hlt");
     }

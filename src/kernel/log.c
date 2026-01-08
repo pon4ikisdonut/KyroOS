@@ -122,7 +122,7 @@ void panic(const char* message, struct registers* regs) {
     console_x = 0;
     console_y = 0;
 
-    klog_print_str("!!! KERNEL PANIC !!!\n");
+    klog_print_str("!!! KERNEL PANIC !!!\n"); // Linus Torvalds, hello, when will you add beautiful panic screens?
     klog_print_str("Message: ");
     klog_print_str(message);
     klog_putchar('\n');

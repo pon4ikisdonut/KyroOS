@@ -3,6 +3,7 @@
 #include "log.h"
 #include "port_io.h"
 #include "fb.h" // For getting screen dimensions
+#include "event.h" // For pushing events
 
 #define KBC_STATUS_PORT 0x64
 #define KBC_CMD_PORT    0x64
@@ -13,6 +14,7 @@ static int32_t mouse_x = 0;
 static int32_t mouse_y = 0;
 static uint8_t mouse_cycle = 0;
 static int8_t mouse_byte[3];
+static uint8_t last_button_state = 0;
 
 // Helper to wait for the keyboard controller to be ready
 static void mouse_wait(uint8_t type) {
@@ -46,7 +48,6 @@ void mouse_handler(struct registers regs) {
     switch(mouse_cycle) {
         case 0:
             mouse_byte[0] = inb(MOUSE_DATA_PORT);
-            // Check for valid first byte (bit 3 should be 1)
             if (mouse_byte[0] & 0x08) {
                 mouse_cycle++;
             }
@@ -59,54 +60,62 @@ void mouse_handler(struct registers regs) {
             mouse_byte[2] = inb(MOUSE_DATA_PORT);
             mouse_cycle = 0;
 
-            // We have a full packet, process it
             int8_t delta_x = mouse_byte[1];
             int8_t delta_y = mouse_byte[2];
 
-            // Handle Y-axis inversion
-            if (mouse_byte[0] & 0x20) {
-                delta_y = -delta_y;
-            }
-            // Handle X-axis inversion/sign
-            if (mouse_byte[0] & 0x10) {
-                delta_x = -delta_x;
-            }
+            if (mouse_byte[0] & 0x20) delta_y = -delta_y;
+            if (mouse_byte[0] & 0x10) delta_x = -delta_x;
 
             mouse_x += delta_x;
-            mouse_y -= delta_y; // Y is typically inverted
+            mouse_y -= delta_y;
 
-            // Clamp to screen dimensions
             const fb_info_t* info = fb_get_info();
             if (mouse_x < 0) mouse_x = 0;
             if (mouse_y < 0) mouse_y = 0;
             if (mouse_x >= info->width) mouse_x = info->width - 1;
             if (mouse_y >= info->height) mouse_y = info->height - 1;
 
-            // TODO: Handle button presses from mouse_byte[0]
+            event_t event;
+            event.type = EVENT_MOUSE_MOVE;
+            event.data1 = mouse_x;
+            event.data2 = mouse_y;
+            event_push(event);
+
+            // Button presses
+            uint8_t current_button_state = mouse_byte[0] & 0x07;
+            if (current_button_state != last_button_state) {
+                event_t btn_event;
+                // Check left button
+                if ((current_button_state & 1) && !(last_button_state & 1)) {
+                    btn_event.type = EVENT_MOUSE_DOWN; btn_event.data1 = 1; event_push(btn_event);
+                } else if (!(current_button_state & 1) && (last_button_state & 1)) {
+                    btn_event.type = EVENT_MOUSE_UP; btn_event.data1 = 1; event_push(btn_event);
+                }
+                // TODO: Check other buttons (right, middle)
+                last_button_state = current_button_state;
+            }
             break;
     }
 }
 
 void mouse_init() {
     mouse_wait(0);
-    outb(KBC_CMD_PORT, 0xA8); // Enable auxiliary device (mouse)
+    outb(KBC_CMD_PORT, 0xA8);
 
-    // Enable IRQ12
     mouse_wait(0);
-    outb(KBC_CMD_PORT, 0x20); // Command to get Compaq status byte
+    outb(KBC_CMD_PORT, 0x20);
     mouse_wait(1);
     uint8_t status = inb(KBC_DATA_PORT);
-    status |= 2; // Set bit 1 to enable IRQ12
-    status &= ~0x20; // Clear bit 5 to disable mouse clock
+    status |= 2;
+    status &= ~0x20;
     mouse_wait(0);
-    outb(KBC_CMD_PORT, 0x60); // Command to set Compaq status byte
+    outb(KBC_CMD_PORT, 0x60);
     mouse_wait(0);
     outb(KBC_DATA_PORT, status);
 
-    // Set defaults and enable mouse
-    mouse_write(0xF6); // Set defaults
+    mouse_write(0xF6);
     mouse_read();
-    mouse_write(0xF4); // Enable data reporting
+    mouse_write(0xF4);
     mouse_read();
 
     register_irq_handler(12, mouse_handler);

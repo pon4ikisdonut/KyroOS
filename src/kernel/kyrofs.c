@@ -101,3 +101,6 @@ void kyrofs_init() {
 vfs_node_t* get_kyrofs_root() {
     return &root_dir->node;
 }
+
+
+// sorry my cat laying on keyboard again
