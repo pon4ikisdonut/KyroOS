@@ -3,20 +3,21 @@
 #include "net.h"
 #include "log.h"
 #include "heap.h"
-#include <string.h> // For memcpy, memset
+#include "kstring.h" // For memcpy, memset
 
 static uint16_t icmp_echo_id = 0;
 static uint16_t icmp_echo_sequence = 0;
 
-// Simple checksum calculation (same as IP, but used for ICMP payload)
-static uint16_t icmp_checksum(const uint16_t* buf, size_t len) {
+// Simple checksum calculation (works with byte arrays for packed structs)
+static uint16_t icmp_checksum(const void* data, size_t len) {
+    const uint16_t* u16_buf = (const uint16_t*)data;
     uint32_t sum = 0;
     while (len > 1) {
-        sum += *buf++;
+        sum += *u16_buf++;
         len -= 2;
     }
     if (len == 1) {
-        sum += *(uint8_t*)buf;
+        sum += *(const uint8_t*)u16_buf;
     }
     while (sum >> 16) {
         sum = (sum & 0xFFFF) + (sum >> 16);
@@ -30,6 +31,9 @@ void icmp_init() {
 }
 
 void icmp_send_echo_request(net_dev_t* net_dev, uint32_t dest_ip, uint16_t id, uint16_t sequence, const uint8_t* data, size_t data_size) {
+    (void)icmp_echo_id;       // Suppress warning
+    (void)icmp_echo_sequence; // Suppress warning
+
     size_t icmp_packet_size = sizeof(icmp_header_t) + data_size;
     uint8_t* icmp_buffer = (uint8_t*)kmalloc(icmp_packet_size);
     if (!icmp_buffer) {
@@ -46,7 +50,8 @@ void icmp_send_echo_request(net_dev_t* net_dev, uint32_t dest_ip, uint16_t id, u
     icmp_hdr->id = __builtin_bswap16(id);
     icmp_hdr->sequence = __builtin_bswap16(sequence);
     memcpy(icmp_data, data, data_size);
-    icmp_hdr->checksum = icmp_checksum((uint16_t*)icmp_hdr, icmp_packet_size);
+    icmp_hdr->checksum = 0; // Clear for checksum calculation
+    icmp_hdr->checksum = icmp_checksum(icmp_buffer, icmp_packet_size);
 
     ip_send_packet(net_dev, dest_ip, IP_PROTOCOL_ICMP, icmp_buffer, icmp_packet_size);
     kfree(icmp_buffer);
@@ -77,7 +82,7 @@ void icmp_handle_packet(net_dev_t* net_dev, const ipv4_header_t* ip_hdr, const u
             icmp_header_t* icmp_reply_hdr = (icmp_header_t*)reply_buffer;
             icmp_reply_hdr->type = ICMP_ECHO_REPLY;
             icmp_reply_hdr->checksum = 0; // Recalculate checksum
-            icmp_reply_hdr->checksum = icmp_checksum((uint16_t*)icmp_reply_hdr, reply_packet_size);
+            icmp_reply_hdr->checksum = icmp_checksum(reply_buffer, reply_packet_size);
 
             ip_send_packet(net_dev, __builtin_bswap32(ip_hdr->src_ip), IP_PROTOCOL_ICMP, reply_buffer, reply_packet_size);
             kfree(reply_buffer);

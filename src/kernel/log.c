@@ -3,7 +3,7 @@
 #include "fb.h"
 #include "font.h"
 #include <stdint.h>
-#include <string.h> // For memcpy
+#include "kstring.h" // For memcpy
 
 // Console state for framebuffer
 static uint32_t console_x = 0;
@@ -18,16 +18,15 @@ static void console_scroll() {
     uint32_t scroll_height = info->height - FONT_HEIGHT;
     
     // Move all lines up by one character height
-    memcpy((void*)info->address, (void*)(info->address + line_size * FONT_HEIGHT), scroll_height * line_size);
+    memcpy((void*)info->address, (void*)(info->address + scroll_height * line_size), (info->height - console_y -1 ) * line_size);
     
     // Clear the last line
-    uint32_t* last_line = (uint32_t*)(info->address + scroll_height * line_size);
-    for (uint32_t i = 0; i < (info->height - scroll_height) * info->width; i++) {
-        last_line[i] = bg_color;
+    uint32_t* last_line_start = (uint32_t*)(info->address + (info->height - FONT_HEIGHT) * line_size / sizeof(uint32_t));
+    for (uint32_t i = 0; i < (info->pitch * FONT_HEIGHT) / sizeof(uint32_t); i++) {
+        last_line_start[i] = bg_color;
     }
-    
-    console_y--;
 }
+
 
 void klog_putchar(char c) {
     const fb_info_t* info = fb_get_info();
@@ -139,7 +138,7 @@ void panic(const char* message, struct registers* regs) {
 
     // Halt the CPU indefinitely
     for (;;) {
-        asm volatile ("hlt");
+        __asm__ __volatile__ ("hlt");
     }
     bg_color = old_bg; // Will never be reached
 }

@@ -2,6 +2,7 @@
 #include "deviceman.h"
 #include "log.h"
 #include "pci.h" // For PCI constants
+#include <stddef.h> // For NULL
 
 // --- Null PCI Driver ---
 static int null_pci_probe(device_t* dev) {
@@ -26,6 +27,7 @@ static int null_pci_attach(device_t* dev) {
 }
 
 static void null_pci_detach(device_t* dev) {
+    (void)dev; // Suppress unused parameter warning
     klog(LOG_INFO, "Null PCI Driver: Detached from a device.");
     // Free any allocated private_data if necessary
 }

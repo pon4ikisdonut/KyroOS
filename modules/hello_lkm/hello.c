@@ -1,5 +1,5 @@
-#include "../src/include/lkm.h"
-#include "../src/include/log.h"
+#include "lkm.h"
+#include "log.h"
 
 int module_init(void) {
     klog(LOG_INFO, "Hello from the example kernel module!");

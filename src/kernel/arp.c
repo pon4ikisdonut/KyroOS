@@ -3,7 +3,7 @@
 #include "net.h" // For getting local MAC
 #include "heap.h" // For kmalloc
 #include "ip.h"   // For local_ip
-#include <string.h> // For memcpy, memset
+#include "kstring.h" // For memcpy, memset
 
 #define ARP_CACHE_SIZE 16
 static arp_cache_entry_t arp_cache[ARP_CACHE_SIZE];

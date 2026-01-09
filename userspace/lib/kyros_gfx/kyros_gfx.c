@@ -19,7 +19,7 @@ static fb_info_t fb_info;
 // Raw syscall function
 static long syscall(long number, long arg1, long arg2, long arg3) {
     long ret;
-    asm volatile (
+    __asm__ volatile (
         "mov %1, %%rax\n\t"
         "mov %2, %%rdi\n\t"
         "mov %3, %%rsi\n\t"
@@ -42,17 +42,17 @@ int gfx_init() {
     return -1; // Failure
 }
 
-void gfx_draw_pixel(int x, int y, uint32_t color) {
-    if (x < 0 || x >= fb_info.width || y < 0 || y >= fb_info.height) {
+void gfx_draw_pixel(uint32_t x, uint32_t y, uint32_t color) {
+    if (x >= fb_info.width || y >= fb_info.height) {
         return;
     }
     uint64_t offset = (y * fb_info.pitch) + (x * (fb_info.bpp / 8));
     *(uint32_t*)((uint64_t)fb_info.address + offset) = color;
 }
 
-void gfx_draw_rect(int x, int y, int width, int height, uint32_t color) {
-    for (int j = 0; j < height; j++) {
-        for (int i = 0; i < width; i++) {
+void gfx_draw_rect(uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint32_t color) {
+    for (uint32_t j = 0; j < height; j++) {
+        for (uint32_t i = 0; i < width; i++) {
             gfx_draw_pixel(x + i, y + j, color);
         }
     }

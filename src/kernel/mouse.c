@@ -42,6 +42,8 @@ static uint8_t mouse_read() {
 
 // The main IRQ12 handler
 void mouse_handler(struct registers regs) {
+    (void)regs; // Suppress unused parameter warning
+    
     uint8_t status = inb(KBC_CMD_PORT);
     if (!(status & 0x20)) return; // Check if data is from mouse
 
@@ -72,8 +74,8 @@ void mouse_handler(struct registers regs) {
             const fb_info_t* info = fb_get_info();
             if (mouse_x < 0) mouse_x = 0;
             if (mouse_y < 0) mouse_y = 0;
-            if (mouse_x >= info->width) mouse_x = info->width - 1;
-            if (mouse_y >= info->height) mouse_y = info->height - 1;
+            if (mouse_x >= (int32_t)info->width) mouse_x = info->width - 1;
+            if (mouse_y >= (int32_t)info->height) mouse_y = info->height - 1;
 
             event_t event;
             event.type = EVENT_MOUSE_MOVE;

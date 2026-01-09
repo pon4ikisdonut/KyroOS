@@ -1,44 +1,44 @@
 # KyroOS
 
-KyroOS is a hobby operating system built from scratch for the x86_64 architecture. It is a monolithic kernel written in C, with a focus on implementing core OS concepts from the ground up.
+**KyroOS** is a **full-featured operating system** for the **x86_64 architecture**, designed to deliver **maximum performance** and efficient hardware utilization. It features a **monolithic kernel written in C**, a higher-half memory layout, and a clean separation between kernel and userspace, implementing core OS concepts from the ground up.
 
 ## Philosophy
 
-- **Hybrid UNIX-like**: Adopts familiar concepts while allowing for custom design choices.
-- **Performance**: Aims for high performance with minimal overhead where possible.
-- **Security**: Designed with basic security principles in mind, such as user/kernel space separation.
-- **Education**: Primarily an educational project to explore and implement operating system internals.
+- **Hybrid UNIX-like**: Combines familiar UNIX concepts with custom design choices.  
+- **Performance-first**: Designed to fully leverage modern hardware for maximum speed and efficiency.  
+- **Security**: Implements kernel/userspace separation and basic integrity checks.  
+- **Practicality**: Intended as a fully usable OS for users and developers, while still being open to experimentation and learning.
 
-## Current Features (as of v26.01-alpha)
+## Current Features (v26.01-alpha)
 
-- **64-bit Kernel**: Runs in x86_64 long mode with a higher-half memory layout.
-- **Bootloader**: Boots via GRUB using the Multiboot2 specification.
-- **Memory Management**: Paging, a physical memory manager (PMM), and a kernel heap (`kmalloc`).
-- **Multitasking**: A preemptive round-robin scheduler for kernel threads.
+- **64-bit Kernel**: Runs in x86_64 long mode with higher-half memory layout.  
+- **Bootloader**: GRUB-compliant, using the Multiboot2 specification.  
+- **Memory Management**: Paging, physical memory manager (PMM), and kernel heap (`kmalloc`).  
+- **Multitasking**: Preemptive round-robin scheduler with kernel threads and context switching.  
 - **Drivers**:
-  - Framebuffer graphics driver.
-  - PS/2 Keyboard and Mouse drivers.
-  - PCI bus scanner.
-  - E1000 NIC driver.
-  - AC'97 Audio driver.
-- **Networking**: A minimal stack supporting ARP, IP, and ICMP (ping).
-- **Filesystem**: A virtual file system (VFS) with an initial in-memory filesystem (KyroFS).
-- **Userspace**: Ability to load and run ELF64 executables, with a syscall interface for kernel communication.
-- **Simple Graphics API**: A userspace library (`kyros_gfx`) provides access to the framebuffer and input events, allowing for simple graphical applications.
+  - Framebuffer graphics  
+  - PS/2 Keyboard & Mouse  
+  - PCI bus scanner  
+  - Intel E1000 NIC  
+  - AC'97 Audio  
+- **Networking**: Minimal stack supporting ARP, IP, and ICMP (ping).  
+- **Filesystem**: Virtual File System (VFS) with in-memory KyroFS implementation.  
+- **Userspace**: ELF64 executable support with system calls.  
+- **Graphics API**: Userspace library (`kyros_gfx`) for framebuffer access and input events, enabling simple graphical applications.
 
-## Building and Running
+## Build and Run
 
-For full instructions on how to set up a cross-compiler and build the project, see [BUILD.md](BUILD.md).
+Follow [BUILD.md](BUILD.md) for full instructions on setting up the cross-compiler and building the project.
 
 ### Quick Start
-1.  **Build**: `make all`
-2.  **Run in QEMU**: `make run`
+1. **Build**: `make all`  
+2. **Run in QEMU**: `make run`
 
 ## Documentation
 
-- **[Build Instructions](BUILD.md)**
-- **[System Architecture](doc/architecture.md)**
-- **[Syscall API](doc/syscalls.md)**
-- **[Package Format](doc/kpkg_format.md)**
-- **[Module Format](doc/module_format.md)**
-- **[Graphics Library API](doc/kyros_gfx_api.md)**
+- **[Build Instructions](BUILD.md)**  
+- **[System Architecture](doc/architecture.md)**  
+- **[Syscall API](doc/syscalls.md)**  
+- **[Package Format (.kpkg)](doc/kpkg_format.md)**  
+- **[Kernel Module Format (.ko)](doc/module_format.md)**  
+- **[Userspace Graphics Library API](doc/kyros_gfx_api.md)**

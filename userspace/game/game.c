@@ -29,17 +29,19 @@ void _start() {
         // Clamp position
         if (x < 0) x = 0;
         if (y < 0) y = 0;
-        if (x > gfx_get_width() - size) x = gfx_get_width() - size;
-        if (y > gfx_get_height() - size) y = gfx_get_height() - size;
+        if ((uint32_t)x > gfx_get_width() - (uint32_t)size) 
+            x = (int)(gfx_get_width() - (uint32_t)size);
+        if ((uint32_t)y > gfx_get_height() - (uint32_t)size) 
+            y = (int)(gfx_get_height() - (uint32_t)size);
 
         // 2. Draw scene
         gfx_draw_rect(0, 0, gfx_get_width(), gfx_get_height(), 0x00000000); // Clear screen (black)
-        gfx_draw_rect(x, y, size, size, 0xFF00FF00); // Draw green square
+        gfx_draw_rect((uint32_t)x, (uint32_t)y, (uint32_t)size, (uint32_t)size, 0xFF00FF00); // Draw green square
         
         // No vsync, just a busy loop for delay
         for(volatile int i = 0; i < 500000; i++);
     }
     
     // Exit (syscall 0)
-    asm volatile ("mov $0, %rax; int $0x80");
+    __asm__ volatile ("mov $0, %%rax; int $0x80" ::: "rax");
 }

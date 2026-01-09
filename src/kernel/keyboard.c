@@ -15,6 +15,8 @@ static const unsigned char kbd_us[128] = {
 };
 
 static void keyboard_handler(struct registers regs) {
+    (void)regs; // Suppress unused parameter warning
+    
     uint8_t scancode = inb(0x60);
     event_t event;
 

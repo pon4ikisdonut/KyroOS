@@ -3,6 +3,7 @@
 #include "vmm.h"
 #include "pmm.h"
 #include "log.h"
+#include <stddef.h> // For NULL
 
 // Selectors from GDT
 #define USER_CODE_SELECTOR 0x18 | 3 // Ring 3
@@ -26,7 +27,7 @@ void enter_userspace(uint64_t entry_point) {
     // Set up the stack for iretq
     uint64_t user_rsp = USER_STACK_VADDR + (USER_STACK_PAGES * PAGE_SIZE);
 
-    asm volatile(
+    __asm__ __volatile__(
         "cli\n\t"
         "pushq %0\n\t"          // SS
         "pushq %1\n\t"          // RSP
@@ -36,5 +37,6 @@ void enter_userspace(uint64_t entry_point) {
         "iretq"
         : 
         : "i"(USER_DATA_SELECTOR), "r"(user_rsp), "i"(0x202), "i"(USER_CODE_SELECTOR), "r"(entry_point)
+        : "memory"
     );
 }

@@ -1,9 +1,8 @@
 ;
 ; KyroOS x86_64 Boot Assembly
-; This file contains the initial 32-bit boot code, transitions to 64-bit long mode,
-; and sets up paging for a higher-half kernel.
+; This file contains the initial 32-bit boot code, transitions to 64-bit long mode.
+; GDT and paging setup is now done in C.
 ;
-default rel
 
 KERNEL_VIRTUAL_BASE equ 0xFFFFFFFF80000000
 KERNEL_PHYSICAL_BASE equ 0x100000 ; 1MB
@@ -23,41 +22,35 @@ header_start:
     dd 768   ; height
     dd 32    ; bpp
 
-    ; Address tag to tell GRUB to load us at KERNEL_PHYSICAL_BASE
-    dw 2
-    dw 0
-    dd 24
-    dd KERNEL_PHYSICAL_BASE
-    dd KERNEL_VIRTUAL_BASE
-    dd _kernel_end - _kernel_start
-    dd _bss_end - _bss_start
     ; End tag
     dw 0, 0, 8
 header_end:
 
-section .data
+section .boot_data
+; Local GDT for initial long mode transition
 align 8
-boot_gdt:
-    dq 0
-.code_segment: dq 0x00AF9A000000FFFF
-.data_segment: dq 0x00CF92000000FFFF
+local_boot_gdt:
+    dq 0 ; Null segment
+    dq 0x00AF9A000000FFFF ; 64-bit Code Segment (Selector 0x08)
+    dq 0x00CF92000000FFFF ; 64-bit Data Segment (Selector 0x10)
 .end:
-boot_gdt_ptr:
-    dw boot_gdt.end - boot_gdt - 1
-    dq boot_gdt
+local_boot_gdt_ptr:
+    dw local_boot_gdt.end - local_boot_gdt - 1
+    dq local_boot_gdt
 
-section .bss
+section .boot_bss nobits
 align 4096
-pml4: resq 512
-pdpt_low: resq 512
-pd_low: resq 512
-pdpt_high: resq 512
-pd_high: resq 512
+kernel_stack: resb 8192
+kernel_stack_top:
 
-global _start, _kernel_start, _kernel_end, _bss_start, _bss_end
+; Local dummy PML4 for initial long mode transition
+align 4096
+local_dummy_pml4: resb 4096
+
+global _start
 extern kmain_x64
 
-section .text
+section .boot_text
 bits 32
 
 _start:
@@ -67,60 +60,18 @@ _start:
     mov es, ax
     mov ss, ax
 
-    ; --- Setup Paging for Higher-Half Kernel ---
-    ; Clear paging structures
-    mov edi, pml4
-    mov ecx, 4096 * 5 / 4 ; 5 pages (pml4, pdpt_low, pd_low, pdpt_high, pd_high)
+    ; Clear dummy PML4
+    mov edi, local_dummy_pml4
+    mov ecx, 1024 ; 512 entries * 8 bytes / 4 bytes per dword = 1024 dwords
     xor eax, eax
     rep stosd
-
-    ; Map first 1GB identity
-    mov edi, pd_low
-    mov ecx, 512
-    mov eax, 0x83 ; Present, R/W, 2MB page
-    .map_low_1gb:
-        mov [edi], eax
-        add eax, 0x200000 ; Next 2MB frame
-        add edi, 8
-        loop .map_low_1gb
-
-    ; Link paging structures for low memory
-    mov edi, pml4
-    mov edx, pdpt_low + 3
-    mov [edi], edx ; pml4[0] -> pdpt_low
-    mov edi, pdpt_low
-    mov edx, pd_low + 3
-    mov [edi], edx ; pdpt_low[0] -> pd_low
-
-    ; Map kernel to higher half
-    mov edi, pdpt_high
-    mov edx, pd_high + 3
-    mov [edi + 511*8], edx ; pdpt_high[511] -> pd_high
     
-    ; The kernel is small, it will fit in one PD.
-    ; We map from KERNEL_PHYSICAL_BASE to KERNEL_VIRTUAL_BASE
-    ; This requires mapping 2MB pages.
-    mov edi, pd_high
-    mov ecx, 256 ; Map 512MB for now
-    mov eax, KERNEL_PHYSICAL_BASE | 0x83
-    .map_kernel:
-        mov [edi], eax
-        add eax, 0x200000
-        add edi, 8
-        loop .map_kernel
-        
-    ; Link paging structures for high memory
-    mov edi, pml4
-    mov edx, pdpt_high + 3
-    mov [edi + 511*8], edx ; pml4[511] -> pdpt_high
-
-
     ; --- Enable Long Mode ---
     mov eax, cr4
     or eax, 1 << 5 ; PAE
     mov cr4, eax
-
-    mov eax, pml4
+    
+    mov eax, local_dummy_pml4
     mov cr3, eax
 
     mov ecx, 0xC0000080 ; EFER MSR
@@ -132,11 +83,15 @@ _start:
     or eax, (1 << 31) | (1 << 0) ; PG and PE
     mov cr0, eax
 
-    lgdt [boot_gdt_ptr]
-    jmp 0x08:long_mode_start
+    lgdt [local_boot_gdt_ptr] ; Load temporary GDT
+
+    ; JUMP TO LONG MODE CODE
+    mov ecx, local_dummy_pml4
+    jmp 0x08:long_mode_entry
 
 bits 64
-long_mode_start:
+long_mode_entry:
+    ; Reload segment registers for 64-bit mode.
     mov ax, 0x10
     mov ss, ax
     mov ds, ax
@@ -145,22 +100,24 @@ long_mode_start:
     mov fs, rax
     mov gs, rax
 
+    ; Set up 64-bit stack
     mov rsp, kernel_stack_top
 
-    mov edi, eax ; Multiboot magic
-    mov rsi, ebx ; Multiboot info
-    call kmain_x64
+    ; Prepare arguments for kmain_x64
+    ; RDI = multiboot magic (from EAX)
+    ; RSI = multiboot info (from EBX)
+    ; RDX = PML4 physical address (from ECX)
+    mov rdx, rcx
+    mov rsi, rbx
+    mov rdi, rax
+    
+    ; Use absolute addressing to call kmain_x64 in high memory
+    mov rax, kmain_x64
+    call rax
 
-.hang:
+hang_loop:
     cli
     hlt
-    jmp .hang
+    jmp hang_loop
 
-section .bss
-align 4096
-kernel_stack: resb 8192
-kernel_stack_top:
-
-_bss_start:
-    ; This is filled by linker
-_bss_end:
+section .note.GNU-stack noalloc noexec nowrite progbits

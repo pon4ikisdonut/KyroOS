@@ -3,7 +3,7 @@
 #include "vmm.h"
 #include "pmm.h"
 #include "heap.h" // For kmalloc
-#include <string.h> // For memcpy, memset
+#include "kstring.h" // For memcpy, memset
 
 // For now, ELF loading will happen into the current address space.
 // A proper implementation would create and switch to a new address space.

@@ -21,7 +21,7 @@ typedef struct vfs_node {
     uint32_t flags;
     uint32_t length;
     uint32_t inode;
-    struct vfs_node* ptr; // Used by mounted filesystems
+    void* ptr; // Used by mounted filesystems
 
     // Function pointers for file operations
     read_vfs_t read;

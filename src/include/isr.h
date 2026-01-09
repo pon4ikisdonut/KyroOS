@@ -18,11 +18,11 @@ typedef void (*irq_handler_t)(struct registers);
 void register_irq_handler(uint8_t irq, irq_handler_t handler);
 
 static inline void enable_interrupts() {
-    asm volatile("sti");
+    __asm__ __volatile__("sti");
 }
 
 static inline void disable_interrupts() {
-    asm volatile("cli");
+    __asm__ __volatile__("cli");
 }
 
 #endif // ISR_H

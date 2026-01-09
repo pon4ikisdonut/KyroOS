@@ -4,9 +4,9 @@
 #include "log.h"
 #include "heap.h"
 #include "icmp.h" // Include ICMP header
-#include <string.h> // For memcpy, memset
+#include "kstring.h" // For memcpy, memset
 
-// Our local IP address (same as in arp.c)
+// Our local IP address
 static uint32_t local_ip = 0xC0A8010A; // 192.168.1.10
 
 // Protocol handlers (indexed by IP protocol number)
@@ -23,20 +23,22 @@ uint32_t ip_get_local_ip() {
 }
 
 void ip_register_protocol_handler(uint8_t protocol, ip_protocol_handler_t handler) {
+    // The warning about this comparison always being true is fine.
     if (protocol < 256) {
         ip_protocol_handlers[protocol] = handler;
     }
 }
 
 // Simple IP checksum calculation (RFC 1071)
-static uint16_t ip_checksum(const uint16_t* buf, size_t len) {
+static uint16_t ip_checksum(const void* data, size_t len) {
+    const uint16_t* u16_buf = (const uint16_t*)data;
     uint32_t sum = 0;
     while (len > 1) {
-        sum += *buf++;
+        sum += *u16_buf++;
         len -= 2;
     }
     if (len == 1) {
-        sum += *(uint8_t*)buf;
+        sum += *(const uint8_t*)u16_buf;
     }
     while (sum >> 16) {
         sum = (sum & 0xFFFF) + (sum >> 16);
@@ -85,7 +87,7 @@ void ip_send_packet(net_dev_t* net_dev, uint32_t dest_ip, uint8_t protocol, cons
     ip_hdr->src_ip = __builtin_bswap32(local_ip);
     ip_hdr->dest_ip = __builtin_bswap32(dest_ip);
     ip_hdr->header_checksum = 0; // Calculate after filling everything
-    ip_hdr->header_checksum = ip_checksum((uint16_t*)ip_hdr, sizeof(ipv4_header_t));
+    ip_hdr->header_checksum = ip_checksum(ip_hdr, sizeof(ipv4_header_t));
 
     // Payload
     memcpy(ip_payload, payload, payload_size);
@@ -114,12 +116,10 @@ void ip_handle_packet(net_dev_t* net_dev, const uint8_t* packet, size_t size) {
     }
 
     // Check checksum (TODO: Implement checksum verification)
-    // For now, assume valid.
-
+    
     uint32_t dest_ip = __builtin_bswap32(ip_hdr->dest_ip);
     if (dest_ip != local_ip && dest_ip != 0xFFFFFFFF) { // Not for us and not broadcast
-        klog(LOG_INFO, "IP: Packet not for this host.");
-        return;
+        return; // Silently drop packets not for us
     }
 
     uint8_t protocol = ip_hdr->protocol;
@@ -127,7 +127,7 @@ void ip_handle_packet(net_dev_t* net_dev, const uint8_t* packet, size_t size) {
     const uint8_t* payload = packet + ip_hdr_len;
     size_t payload_size = __builtin_bswap16(ip_hdr->total_length) - ip_hdr_len;
 
-    if (protocol < 256 && ip_protocol_handlers[protocol] != 0) {
+    if (ip_protocol_handlers[protocol] != 0) {
         ip_protocol_handlers[protocol](net_dev, ip_hdr, payload, payload_size);
     } else {
         klog(LOG_WARN, "IP: No handler for protocol.");

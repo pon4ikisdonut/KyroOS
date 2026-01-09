@@ -1,7 +1,8 @@
 #include "gui.h"
 #include "fb.h"
 #include "mouse.h"
-#include "log.h" // For klog
+#include "log.h"
+#include "font.h" // For FONT_WIDTH
 
 // Simple window structure
 typedef struct {

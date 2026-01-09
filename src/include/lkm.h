@@ -2,6 +2,7 @@
 #define LKM_H
 
 #include <stdint.h>
+#include <stddef.h>
 
 // Module initialization function type
 typedef int (*lkm_init_t)(void);

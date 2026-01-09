@@ -1,35 +1,30 @@
 #include "fb.h"
 #include "font.h"
 #include "log.h"
+#include "multiboot2.h" // Needed for the framebuffer tag struct
 #include <stddef.h> // for NULL
 
 static fb_info_t fb_info;
 
 // Basic 8x16 font for ASCII characters
-// This is a minimal font for demonstration. A full font would be much larger.
+// A full font would be much larger. This is just for demonstration.
 const uint8_t default_font[256][FONT_HEIGHT] = {
-    // Basic characters (e.g., 'A', 'B', 'C', '!', '?')
-    // For now, let's just define a solid block for any character to test drawing
-    [0 ... 255] = { // Default all chars to a block
-        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 
-        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
-    },
-    ['A'] = {
-        0x00, 0x18, 0x24, 0x42, 0x42, 0x7E, 0x42, 0x42,
-        0x42, 0x42, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    },
-    ['!'] = {
-        0x00, 0x18, 0x18, 0x18, 0x18, 0x18, 0x00, 0x18,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    },
+    // Only defining a few characters. C automatically zero-initializes the rest.
+    ['A'] = { 0x00, 0x18, 0x24, 0x42, 0x42, 0x7E, 0x42, 0x42, 0x42, 0x42, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
+    ['B'] = { 0x00, 0x7C, 0x42, 0x42, 0x7C, 0x42, 0x42, 0x7C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
+    ['C'] = { 0x00, 0x3C, 0x42, 0x40, 0x40, 0x40, 0x42, 0x3C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
+    ['!'] = { 0x00, 0x18, 0x18, 0x18, 0x18, 0x00, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
+    // A block for any undefined character
+    [0] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF },
 };
 
 void fb_init(uint32_t multiboot_info_addr) {
     struct multiboot_tag_framebuffer* fb_tag = (struct multiboot_tag_framebuffer*)find_multiboot_tag(multiboot_info_addr, MULTIBOOT_TAG_TYPE_FRAMEBUFFER);
 
     if (!fb_tag) {
-        panic("Framebuffer not found!", NULL);
-        return;
+        // Cannot use klog/panic here as the framebuffer isn't initialized.
+        // Halt in a loop.
+        for(;;);
     }
 
     fb_info.address = (uint32_t*)(uint64_t)fb_tag->common.framebuffer_addr;
@@ -39,11 +34,12 @@ void fb_init(uint32_t multiboot_info_addr) {
     fb_info.bpp = fb_tag->common.framebuffer_bpp;
 
     if (fb_info.bpp != 32) {
-        panic("Framebuffer is not 32-bpp!", NULL);
-        return;
+        // Cannot use klog/panic.
+        for(;;);
     }
-
-    klog(LOG_INFO, "Framebuffer initialized.");
+    
+    // Do not log from here, as log_init() hasn't been called.
+    // kmain will log after calling this.
     fb_clear_screen(0x00101030); // Dark blue background
 }
 
@@ -55,7 +51,6 @@ void fb_put_pixel(uint32_t x, uint32_t y, uint32_t color) {
     if (x >= fb_info.width || y >= fb_info.height) {
         return;
     }
-    // Calculate the offset in the linear framebuffer
     uint64_t offset = (y * fb_info.pitch) + (x * (fb_info.bpp / 8));
     *(uint32_t*)((uint64_t)fb_info.address + offset) = color;
 }
@@ -69,7 +64,8 @@ void fb_clear_screen(uint32_t color) {
 }
 
 void fb_draw_char(char c, uint32_t x, uint32_t y, uint32_t fg_color, uint32_t bg_color) {
-    const uint8_t* glyph = default_font[(int)c];
+    // Use the block for any character that is not defined
+    const uint8_t* glyph = (c > 0 && default_font[(int)c][0] != 0) ? default_font[(int)c] : default_font[0];
 
     for (int row = 0; row < FONT_HEIGHT; row++) {
         for (int col = 0; col < FONT_WIDTH; col++) {

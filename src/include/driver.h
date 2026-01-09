@@ -10,8 +10,15 @@ struct driver;
 // --- Device Structure ---
 typedef struct device {
     char name[64];
+    
+    // PCI device info
+    uint8_t bus;
+    uint8_t device;
+    uint8_t func;
+    
     uint16_t vendor_id;
     uint16_t device_id;
+    
     // ... other device specific information
     struct driver* driver; // Pointer to the driver handling this device
     struct device* next;   // Linked list of devices

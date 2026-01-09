@@ -1,8 +1,9 @@
 # Makefile for hello_lkm
 
-TARGET = x86_64-elf
+TARGET = x86_64-linux-gnu
 CC = $(TARGET)-gcc
-K_CFLAGS = -Wall -Wextra -std=c11 -ffreestanding -O2 -I../src/include -mcmodel=large -mno-red-zone -m64 -c
+K_CFLAGS = -Wall -Wextra -std=c11 -ffreestanding -O2 -I../../src/include \
+           -mcmodel=large -mno-red-zone -m64 -c -fno-stack-protector -nostdlib
 
 SRC = hello.c
 OBJ = hello.o

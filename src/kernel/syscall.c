@@ -15,6 +15,7 @@ static syscall_func_t syscall_table[256];
 // --- Syscall Implementations ---
 
 static void sys_exit(struct registers* regs) {
+    (void)regs; // Suppress unused parameter warning
     klog(LOG_INFO, "Syscall: exit");
     thread_exit();
 }

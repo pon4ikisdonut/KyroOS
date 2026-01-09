@@ -1,5 +1,6 @@
 #include <stdint.h>
-#include <string.h>
+#include "kstring.h"
+#include <stddef.h> // For NULL
 
 #include "gdt.h"
 #include "idt.h"
@@ -16,6 +17,18 @@
 #include "event.h"
 #include "keyboard.h"
 #include "mouse.h"
+
+// Global page table structures - aligned to 4KB
+__attribute__((aligned(4096)))
+pml4_t _kernel_pml4; // Now defined directly in C
+__attribute__((aligned(4096)))
+pdpt_t _kernel_pdpt_low; // For identity mapping low memory
+__attribute__((aligned(4096)))
+pd_t _kernel_pd_low;     // For identity mapping low memory
+__attribute__((aligned(4096)))
+pdpt_t _kernel_pdpt_high; // For higher-half kernel mapping
+__attribute__((aligned(4096)))
+pd_t _kernel_pd_high;     // For higher-half kernel mapping
 
 // Helper function to find a multiboot module tag by its command line string
 static struct multiboot_tag_module* find_module_tag(uint32_t info_addr, const char* name) {
@@ -39,27 +52,64 @@ static struct multiboot_tag_module* find_module_tag(uint32_t info_addr, const ch
     return NULL;
 }
 
+// Function to initialize paging in C
+static void setup_paging_c(uint64_t pml4_phys_addr) {
+    pml4_t* kernel_pml4 = (pml4_t*)pml4_phys_addr;
 
-void kmain_x64(uint32_t multiboot_magic, uint32_t multiboot_info_addr) {
+    // Clear page tables (PML4 is already cleared by boot.asm)
+    memset(&_kernel_pml4, 0, PAGE_SIZE); // Clear our kernel's PML4
+    memset(&_kernel_pdpt_low, 0, PAGE_SIZE);
+    memset(&_kernel_pd_low, 0, PAGE_SIZE);
+    memset(&_kernel_pdpt_high, 0, PAGE_SIZE);
+    memset(&_kernel_pd_high, 0, PAGE_SIZE);
+
+    // Identity map first 1GB
+    for (int i = 0; i < 512; i++) { // 512 * 2MB = 1GB
+        _kernel_pd_low.entries[i] = (i * 0x200000) | PAGE_PRESENT | PAGE_WRITE | PAGE_USER | (1 << 7); // 2MB page
+    }
+    _kernel_pdpt_low.entries[0] = (uint64_t)&_kernel_pdpt_low | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
+    _kernel_pml4.entries[0] = (uint64_t)&_kernel_pdpt_low | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
+
+    // Higher-half kernel mapping (example: 512MB starting at KERNEL_PHYSICAL_BASE)
+    for (int i = 0; i < 256; i++) { // 256 * 2MB = 512MB
+        _kernel_pd_high.entries[i] = (0x100000 + i * 0x200000) | PAGE_PRESENT | PAGE_WRITE | PAGE_USER | (1 << 7); // 2MB page
+    }
+    _kernel_pdpt_high.entries[511] = (uint64_t)&_kernel_pd_high | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
+    _kernel_pml4.entries[511] = (uint64_t)&_kernel_pdpt_high | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
+
+    // Reload CR3 with our new PML4 (since boot.asm was using a basic one)
+    __asm__ __volatile__("mov %0, %%cr3" : : "r"((uint64_t)&_kernel_pml4));
+    klog(LOG_INFO, "Paging setup in C complete.");
+}
+
+
+void kmain_x64(uint32_t multiboot_magic, uint32_t multiboot_info_addr, uint64_t pml4_phys_addr) {
     
     // Initialize framebuffer first, so we can log messages.
     fb_init(multiboot_info_addr);
     log_init();
 
-    klog(LOG_INFO, "KyroOS 26.01 \"Helium\" alpha");
+    klog(LOG_INFO, "KyroOS 26.01.002 \"Helium\""); // Updated version string
     klog(LOG_INFO, "---------------------------------");
 
     if (multiboot_magic != MULTIBOOT2_BOOTLOADER_MAGIC) {
         panic("Invalid Multiboot magic number!", NULL);
         return;
     }
+    klog(LOG_INFO, "Multiboot2 magic: OK");
+
+    // Setup paging in C (full setup, building on minimal ASM setup)
+    setup_paging_c((uint64_t)&_kernel_pml4); // Use our locally defined PML4
 
     // Initialize core kernel systems
     gdt_init();
+    klog(LOG_INFO, "GDT initialized.");
     tss_init();
+    klog(LOG_INFO, "TSS initialized.");
     idt_init();
+    klog(LOG_INFO, "IDT initialized.");
     pmm_init(multiboot_info_addr);
-    vmm_init();
+    vmm_init(); // VMM now relies on _kernel_pml4
     heap_init();
     syscall_init();
     event_init();
@@ -92,6 +142,6 @@ void kmain_x64(uint32_t multiboot_magic, uint32_t multiboot_info_addr) {
     // We should never get here
     klog(LOG_ERROR, "Failed to enter userspace.");
     for (;;) {
-        asm volatile ("hlt");
+        __asm__ __volatile__ ("hlt");
     }
 }

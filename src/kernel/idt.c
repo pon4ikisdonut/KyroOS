@@ -106,5 +106,5 @@ void idt_init() {
 
     idt_set_gate(128, (uint64_t)isr128, KERNEL_CS, USER_GATE_FLAGS);
 
-    asm volatile("lidt %0" : : "m"(idt_ptr));
+    __asm__ __volatile__("lidt %0" : : "m"(idt_ptr));
 }

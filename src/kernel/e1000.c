@@ -10,7 +10,7 @@
 #include "pci.h"
 #include "arp.h" // Include ARP header
 #include "ip.h"  // Include IP header
-#include <string.h> // For memset, memcpy
+#include "kstring.h" // For memset, memcpy
 
 #define E1000_VENDOR_ID 0x8086
 #define E1000_DEVICE_ID_82540EM 0x100e
@@ -135,12 +135,16 @@ void net_register_device(net_dev_t* net_dev) {
 
 // --- E1000 Interrupt Handler ---
 static void e1000_interrupt_handler(struct registers regs) {
+    (void)regs; // Suppress unused parameter warning
+    
     e1000_device_t* e1000_dev = (e1000_device_t*)((device_t*)network_devices->dev)->private_data;
 
     uint32_t icr = e1000_read_reg(e1000_dev, E1000_REG_ICR);
     if (!icr) return; // Not our interrupt
 
-    klog(LOG_INFO, "E1000 Interrupt! ICR: "); klog_print_hex(icr, 0x0F); klog_putchar('\n', 0x0F);
+    klog_print_str("E1000 Interrupt! ICR: "); 
+    klog_print_hex(icr);
+    klog_putchar('\n');
     
     // Handle received packets
     while ((e1000_dev->rx_descs[e1000_dev->rx_cur].status & 0x01)) { // DD bit set
@@ -326,6 +330,7 @@ static int e1000_attach(device_t* dev) {
 }
 
 static void e1000_detach(device_t* dev) {
+    (void)dev; // Suppress unused parameter warning
     klog(LOG_INFO, "E1000: Detaching driver from device.");
     // Free resources, disable device, etc.
 }

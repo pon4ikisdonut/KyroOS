@@ -9,6 +9,7 @@ extern pml4_t pml4[];
 static pml4_t* kernel_pml4 = (pml4_t*)pml4;
 
 void vmm_init() {
+    (void)kernel_pml4; // Suppress unused variable warning for now
     // The bootloader has already set up identity mapping for the first 1GB
     // and mapped the kernel to the higher half.
     // We can now take control of the page tables.
@@ -22,7 +23,7 @@ void vmm_init() {
 // Helper to get the physical address of the PML4
 static inline uint64_t get_pml4_phys() {
     uint64_t pml4_phys;
-    asm volatile("mov %%cr3, %0" : "=r"(pml4_phys));
+    __asm__ __volatile__("mov %%cr3, %0" : "=r"(pml4_phys));
     return pml4_phys;
 }
 
@@ -72,7 +73,7 @@ void vmm_map_page(void* virt, void* phys, uint64_t flags) {
     pt->entries[pt_index] = (uint64_t)phys | flags;
 
     // Invalidate the TLB entry for this address
-    asm volatile("invlpg (%0)" :: "r"(virt_addr) : "memory");
+    __asm__ __volatile__("invlpg (%0)" :: "r"(virt_addr) : "memory");
 }
 
 void vmm_unmap_page(void* virt) {
@@ -101,5 +102,5 @@ void vmm_unmap_page(void* virt) {
     pt->entries[pt_index] = 0;
     
     // Invalidate TLB
-    asm volatile("invlpg (%0)" :: "r"(virt_addr) : "memory");
+    __asm__ __volatile__("invlpg (%0)" :: "r"(virt_addr) : "memory");
 }

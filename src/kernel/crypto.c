@@ -8,6 +8,7 @@
 //
 
 void sha256_hash(const uint8_t* data, size_t len, uint8_t* hash_out) {
+    (void)data; // Suppress unused parameter warning
     // STUB: This is not a real hash function.
     // It just provides a predictable "hash" for demonstration.
     klog(LOG_INFO, "CRYPTO_STUB: sha256_hash called.");

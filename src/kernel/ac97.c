@@ -5,8 +5,10 @@
 #include "log.h"
 #include "heap.h"
 #include "isr.h"
-#include "port_io.h" // for in/out
-#include <string.h> // for memset
+#include "port_io.h"
+#include "pmm.h"      // For pmm_alloc_page
+#include "deviceman.h" // For deviceman_register_driver
+#include "kstring.h"    // For memset, memcpy
 
 // AC'97 Register Offsets (Native Audio Mixer Bus Master)
 #define AC97_NAM_RESET          0x00
@@ -55,6 +57,7 @@ static int ac97_probe(device_t* dev) {
 }
 
 static void ac97_interrupt_handler(struct registers regs) {
+    (void)regs; // Suppress unused parameter warning
     if (main_ac97_device) {
         uint16_t status = inw(main_ac97_device->nabm_bar + AC97_SR);
         if (status & 0x04) { // Interrupt on Completion

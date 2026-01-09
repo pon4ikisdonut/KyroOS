@@ -5,17 +5,6 @@
 #include "deviceman.h"
 #include <string.h> // For memset
 
-// Helper functions for PCI configuration space access using I/O ports
-static inline void outl(uint16_t port, uint32_t val) {
-    asm volatile ("outl %0, %1" : : "a"(val), "Nd"(port));
-}
-
-static inline uint32_t inl(uint16_t port) {
-    uint32_t ret;
-    asm volatile ("inl %1, %0" : "=a"(ret) : "Nd"(port));
-    return ret;
-}
-
 // Function to construct PCI address
 inline uint32_t pci_get_addr(uint8_t bus, uint8_t device, uint8_t func, uint8_t offset) {
     return (uint32_t)((bus << 16) | (device << 11) | (func << 8) | (offset & 0xFC) | 0x80000000);
@@ -81,6 +70,8 @@ static void pci_check_function(uint8_t bus, uint8_t device, uint8_t func) {
     uint16_t deviceID = pci_get_device_id(bus, device, func);
     uint8_t classCode = pci_get_class(bus, device, func);
     uint8_t subclassCode = pci_get_subclass(bus, device, func);
+    (void)classCode; // Suppress unused variable warning
+    (void)subclassCode; // Suppress unused variable warning
 
     device_t* dev = (device_t*)kmalloc(sizeof(device_t));
     if (!dev) {
@@ -97,9 +88,6 @@ static void pci_check_function(uint8_t bus, uint8_t device, uint8_t func) {
     dev->device_id = deviceID;
     strncpy(dev->name, "PCI Device", sizeof(dev->name) - 1); // Generic name
     
-    // Log for debugging
-    // This part is problematic with klog only taking strings. Need a proper ksprintf.
-    // For now, simple logging.
     klog(LOG_INFO, "PCI: Found device (VendorID: 0xXX, DeviceID: 0xYY)"); // Placeholder log
 
     deviceman_register_device(dev);
@@ -133,5 +121,4 @@ void pci_check_all_buses() {
 
 void pci_init() {
     // No specific initialization for now.
-    // Ensure outl/inl are available
 }

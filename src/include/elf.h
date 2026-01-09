@@ -54,6 +54,7 @@ typedef struct {
 #define ELFCLASS64 2
 
 // e_type
+#define ET_REL  1 // Relocatable file
 #define ET_EXEC 2 // Executable file
 
 // p_type
