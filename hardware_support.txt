@@ -1,0 +1,9 @@
+- Minimum requirements: TBD
+- Supported hardware:
+    - Xeon CPUs (Haswell architecture, priority): Not yet implemented
+    - Intel C612 chipsets (priority): Not yet implemented
+    - AMD Polaris series GPUs (all models, priority): Not yet implemented
+    - NVMe, M.2, SATA SSD/HDD, IDE drives: Not yet implemented
+    - Network adapters (Ethernet), Wi-Fi, Bluetooth: Not yet implemented
+    - Popular chipsets/motherboards: Not yet implemented
+- Special notes or quirks: TBD

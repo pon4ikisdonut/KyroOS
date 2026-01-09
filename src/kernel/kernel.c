@@ -17,6 +17,7 @@
 #include "event.h"
 #include "keyboard.h"
 #include "mouse.h"
+#include "version.h" // Include version.h
 
 // Global page table structures - aligned to 4KB
 __attribute__((aligned(4096)))
@@ -89,7 +90,9 @@ void kmain_x64(uint32_t multiboot_magic, uint32_t multiboot_info_addr, uint64_t 
     fb_init(multiboot_info_addr);
     log_init();
 
-    klog(LOG_INFO, "KyroOS 26.01.002 \"Helium\""); // Updated version string
+    char version_string[64]; // Buffer to hold the formatted version string
+    ksprintf(version_string, "KyroOS %d.%02d.%04d \"%s\"", KYROS_VERSION_MAJOR, KYROS_VERSION_MINOR, KYROS_VERSION_BUILD, KYROS_VERSION_CODENAME);
+    klog(LOG_INFO, version_string);
     klog(LOG_INFO, "---------------------------------");
 
     if (multiboot_magic != MULTIBOOT2_BOOTLOADER_MAGIC) {
