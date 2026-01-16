@@ -18,8 +18,8 @@ KyroOS is an experimental 64-bit operating system for the x86-64 architecture, d
 ## System Requirements
 
 *   **CPU:** x86-64 compatible processor.
-*   **RAM:** Minimum 64 MB.
-*   **Storage:** Minimum 100 MB for installation.
+*   **RAM:** Minimum 24 MB.
+*   **Storage:** Minimum 100 MB flash drive (The installation of the system will be fully implemented in the future)
 *   **Boot:** BIOS or UEFI firmware.
 
 ## Quick Build Overview
