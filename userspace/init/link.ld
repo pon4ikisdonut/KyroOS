@@ -19,6 +19,8 @@ SECTIONS {
     } :data
 
     .bss : {
+        _bss_start = .;
         *(.bss .bss.*)
+        _bss_end = .;
     } :data
 }

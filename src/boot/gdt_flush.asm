@@ -5,6 +5,9 @@ gdt_flush:
     ; rdi holds the address of the GDT pointer
     lgdt [rdi]
     
+    ; DEBUG: Return immediately to see if lgdt works
+    ; ret
+
     ; Reload data segments
     mov ax, 0x10    ; Kernel Data Selector
     mov ds, ax

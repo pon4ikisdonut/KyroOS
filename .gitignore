@@ -1,6 +1,22 @@
-/build
-/kyroos.iso
+# Build artifacts
+/build/
+*.iso
+
+# VSCode metadata
+/.vscode/
+
+# Limine bootloader
+/limine/
+/limine.zip
+
+# Node.js
+/node_modules/
+package-lock.json
+package.json
+
 do.txt
-error.txt
-build_void
+f.txt
 t.txt
+temp_instructions.md
+/doc/
+1.md

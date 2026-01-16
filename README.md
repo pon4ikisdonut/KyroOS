@@ -1,44 +1,75 @@
-# KyroOS
+# KyroOS - A Modern x86-64 Operating System
 
-**KyroOS** is a **full-featured operating system** for the **x86_64 architecture**, designed to deliver **maximum performance** and efficient hardware utilization. It features a **monolithic kernel written in C**, a higher-half memory layout, and a clean separation between kernel and userspace, implementing core OS concepts from the ground up.
+KyroOS is an experimental 64-bit operating system for the x86-64 architecture, developed as a learning project. It features a monolithic kernel designed for simplicity, readability, and extensibility.
 
-## Philosophy
+## Key Features
 
-- **Hybrid UNIX-like**: Combines familiar UNIX concepts with custom design choices.  
-- **Performance-first**: Designed to fully leverage modern hardware for maximum speed and efficiency.  
-- **Security**: Implements kernel/userspace separation and basic integrity checks.  
-- **Practicality**: Intended as a fully usable OS for users and developers, while still being open to experimentation and learning.
+*   **x86-64 Architecture:** Leverages modern 64-bit computing capabilities.
+*   **Monolithic Kernel:** Simple, readable, and educational kernel design.
+*   **Memory Management:** Physical Memory Manager (PMM) and Virtual Memory Manager (VMM) with demand paging.
+*   **Multitasking:** Preemptive, round-robin scheduler for efficient task switching.
+*   **Basic Drivers:** Support for keyboard, mouse, framebuffer, IDE hard disks, E1000 network cards, and AC97 audio.
+*   **Virtual File System (VFS):** Unified interface for file operations, with KyroFS (in-memory and disk-based) as the primary filesystem.
+*   **Userspace Environment:** A basic shell (`kyroshell`) and a set of core utilities (`cat`, `ls`, `mkdir`, etc.).
+*   **Networking Stack:** Support for ARP, IP, UDP, and a stubbed TCP implementation.
+*   **Package Manager (`kpm`):** Simple command-line tool for managing userspace software.
+*   **Installer:** An automated installer to prepare disk partitions.
 
-## Current Features (v26.01-alpha)
+## System Requirements
 
-- **64-bit Kernel**: Runs in x86_64 long mode with higher-half memory layout.  
-- **Bootloader**: GRUB-compliant, using the Multiboot2 specification.  
-- **Memory Management**: Paging, physical memory manager (PMM), and kernel heap (`kmalloc`).  
-- **Multitasking**: Preemptive round-robin scheduler with kernel threads and context switching.  
-- **Drivers**:
-  - Framebuffer graphics  
-  - PS/2 Keyboard & Mouse  
-  - PCI bus scanner  
-  - Intel E1000 NIC  
-  - AC'97 Audio  
-- **Networking**: Minimal stack supporting ARP, IP, and ICMP (ping).  
-- **Filesystem**: Virtual File System (VFS) with in-memory KyroFS implementation.  
-- **Userspace**: ELF64 executable support with system calls.  
-- **Graphics API**: Userspace library (`kyros_gfx`) for framebuffer access and input events, enabling simple graphical applications.
+*   **CPU:** x86-64 compatible processor.
+*   **RAM:** Minimum 64 MB.
+*   **Storage:** Minimum 100 MB for installation.
+*   **Boot:** BIOS or UEFI firmware.
 
-## Build and Run
+## Quick Build Overview
 
-Follow [BUILD.md](BUILD.md) for full instructions on setting up the cross-compiler and building the project.
+KyroOS is built using a standard GNU toolchain (GCC, Make, NASM, xorriso). It can be built on a native Linux environment or on Windows Subsystem for Linux (WSL).
 
-### Quick Start
-1. **Build**: `make all`  
-2. **Run in QEMU**: `make run`
+1.  **Install Toolchain:** On a Debian-based system (like Ubuntu or WSL):
+    ```bash
+    sudo apt-get update
+    sudo apt-get install build-essential nasm xorriso gcc-x86-64-linux-gnu
+    ```
+2.  **Build Project:** Navigate to the project root and run:
+    ```bash
+    make all
+    ```
+    This will compile the kernel and userspace programs, and create `kyroos.iso`.
+
+## Installation Overview
+
+KyroOS installation is currently a manual process involving two main stages:
+1.  Booting from the `kyroos.iso` to run the built-in installer.
+2.  Manually installing and configuring the Limine bootloader on your target disk.
+
+Refer to the full `[Installation Guide](docs/install.md)` for detailed steps.
 
 ## Documentation
 
-- **[Build Instructions](BUILD.md)**  
-- **[System Architecture](doc/architecture.md)**  
-- **[Syscall API](doc/syscalls.md)**  
-- **[Package Format (.kpkg)](doc/kpkg_format.md)**  
-- **[Kernel Module Format (.ko)](doc/module_format.md)**  
-- **[Userspace Graphics Library API](doc/kyros_gfx_api.md)**
+The full documentation for KyroOS can be found in the `docs/` directory.
+
+*   [Overview](docs/overview.md)
+*   [Build Instructions](docs/build.md)
+*   [Installation Guide](docs/install.md)
+*   [Boot Process](docs/boot.md)
+*   [Kernel Architecture](docs/kernel.md)
+*   [Memory Management](docs/memory.md)
+*   [Scheduler](docs/scheduler.md)
+*   [Device Drivers](docs/drivers.md)
+*   [Filesystem](docs/filesystem.md)
+*   [Userspace](docs/userspace.md)
+*   [KyroOS Shell](docs/shell.md)
+*   [Core Utilities](docs/coreutils.md)
+*   [Package Manager (kpm)](docs/kpm.md)
+*   [Installer](docs/installer.md)
+*   [Security](docs/security.md)
+*   [Debugging](docs/debug.md)
+*   [Kernel Panics](docs/kernel_panics.md)
+*   [Versioning](docs/versioning.md)
+*   [FAQ](docs/faq.md)
+*   [**Unified Manual (all.md)**](docs/all.md)
+
+## Warning
+
+KyroOS is under heavy development and is considered an **alpha** quality operating system. It is not stable, may contain significant bugs, and is not suitable for production use.

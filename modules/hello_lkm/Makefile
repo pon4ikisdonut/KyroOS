@@ -12,7 +12,7 @@ KO = hello.ko
 all: $(KO)
 
 $(KO): $(OBJ)
-	cp $(OBJ) $(KO)
+	cp -f $(OBJ) $(KO)
 	# Signing step would happen here with a userspace tool
 
 $(OBJ): $(SRC)

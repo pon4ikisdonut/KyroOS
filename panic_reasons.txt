@@ -1,0 +1,50 @@
+# KyroOS Kernel Panic Reasons
+
+This document outlines known and potential causes of kernel panics in KyroOS. A kernel panic indicates a fatal, unrecoverable error from which the system cannot safely continue operation.
+
+## Documented Panic Causes:
+
+1.  **Framebuffer Initialization Failure:**
+    *   **Location:** `src/kernel/kernel.c`, `kmain_x64`
+    *   **Condition:** The Limine bootloader fails to provide a valid framebuffer response (`framebuffer_request.response == NULL` or `framebuffer_request.response->framebuffer_count < 1`).
+    *   **Impact:** System cannot initialize graphical output and halts immediately.
+
+2.  **No Runnable Threads in Scheduler:**
+    *   **Location:** `src/kernel/scheduler.c`, `schedule()`
+    *   **Condition:** The scheduler attempts to find a thread to execute, but no threads are in `THREAD_READY` state, and the `current_thread` is either blocked or dead.
+    *   **Impact:** The system has no work to perform and cannot continue.
+
+3.  **Failed to Allocate Main Kernel Thread:**
+    *   **Location:** `src/kernel/thread.c`, `thread_init()`
+    *   **Condition:** `kmalloc()` fails to allocate memory for the `thread_t` structure of the initial kernel thread (kmain).
+    *   **Impact:** Core thread management cannot be initialized, preventing any further execution.
+
+4.  **Returned to a Dead Thread:**
+    *   **Location:** `src/kernel/thread.c`, `thread_exit()`
+    *   **Condition:** After a thread calls `thread_exit()` and the scheduler is invoked, control unexpectedly returns to the exited (dead) thread. This indicates a severe scheduler or context switching error.
+    *   **Impact:** The system has returned to an invalid state; the dead thread's resources may have been freed.
+
+5.  **General Memory Allocation Failures (`kmalloc`):**
+    *   **Location:** Various kernel components (e.g., drivers, network stack).
+    *   **Condition:** `kmalloc()` returns `NULL` (out of memory), and the calling code does not handle this gracefully, leading to dereferencing a null pointer or proceeding with invalid memory.
+    *   **Specific Instances (as identified):**
+        *   **E1000 Driver:** Failed allocation for `e1000_device_t`, Rx/Tx descriptor memory, or Rx/Tx buffers in `e1000_attach()`.
+        *   **AC97 Driver:** Failed allocation for `ac97_dev_t`, or BDL in `ac97_attach()`.
+        *   **IP Layer:** Failed allocation for `packet_buffer` in `ip_send_packet()`.
+        *   **ARP Layer:** Failed allocation for `packet_buffer` in `arp_send_request()`, or `reply_buffer` in `arp_handle_packet()`.
+        *   **DHCP Layer:** Failed allocation for `packet_buffer` in `dhcp_discover()`.
+
+6.  **Invalid IP Header Checksum:**
+    *   **Location:** `src/kernel/ip.c`, `ip_handle_packet()`
+    *   **Condition:** An incoming IPv4 packet has an invalid header checksum.
+    *   **Impact:** The packet is considered corrupt and dropped, but if not caught early, could lead to further network stack issues. (Note: Currently logged as WARN, not a panic, but listed here as a network integrity check).
+
+7.  **Invalid DHCP Packet (Magic Cookie or XID):**
+    *   **Location:** `src/kernel/dhcp.c`, `dhcp_handle_reply()`
+    *   **Condition:** A received DHCP reply has an incorrect magic cookie or transaction ID, indicating a potentially malformed or unexpected packet.
+    *   **Impact:** The DHCP process is interrupted, preventing IP configuration.
+
+8.  **Missing or Invalid DHCP Message Type Option:**
+    *   **Location:** `src/kernel/dhcp.c`, `dhcp_handle_reply()`
+    *   **Condition:** A received DHCP packet lacks the mandatory DHCP Message Type option or it's malformed.
+    *   **Impact:** The DHCP process cannot determine the type of message and thus cannot proceed with IP configuration.

@@ -21,11 +21,12 @@ void enter_userspace(uint64_t entry_point) {
         if (!page) {
             panic("Failed to allocate user stack!", NULL);
         }
-        vmm_map_page((void*)(USER_STACK_VADDR + i * PAGE_SIZE), page, PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
+        vmm_map_page_current((void*)(uintptr_t)(USER_STACK_VADDR + i * PAGE_SIZE), page, PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
     }
     
     // Set up the stack for iretq
     uint64_t user_rsp = USER_STACK_VADDR + (USER_STACK_PAGES * PAGE_SIZE);
+    klog(LOG_INFO, "User stack allocated at vaddr %p, user_rsp = %p", (void*)USER_STACK_VADDR, (void*)user_rsp);
 
     __asm__ __volatile__(
         "cli\n\t"

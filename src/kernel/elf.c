@@ -2,13 +2,21 @@
 #include "log.h"
 #include "vmm.h"
 #include "pmm.h"
-#include "heap.h" // For kmalloc
-#include "kstring.h" // For memcpy, memset
+#include "heap.h"
+#include "kstring.h"
+#include "vfs.h"
+#include "thread.h"
 
-// For now, ELF loading will happen into the current address space.
-// A proper implementation would create and switch to a new address space.
+extern uint64_t hhdm_offset;
+#define P_TO_V(p) ((void*)((uint64_t)(p) + hhdm_offset))
 
-int elf_load(const uint8_t* elf_data) {
+int elf_load(pml4_t* pml4, const uint8_t* elf_data) {
+    klog(LOG_INFO, "ELF: elf_load entered with data at %x", elf_data);
+    if (!elf_data) {
+        klog(LOG_ERROR, "ELF: elf_load called with NULL data.");
+        return 0;
+    }
+
     const Elf64_Ehdr* header = (const Elf64_Ehdr*)elf_data;
 
     // 1. Validate ELF Header
@@ -35,35 +43,86 @@ int elf_load(const uint8_t* elf_data) {
         const Elf64_Phdr* p_header = (const Elf64_Phdr*)(elf_data + header->e_phoff + (i * header->e_phentsize));
         
         if (p_header->p_type == PT_LOAD) {
-            // This is a loadable segment
-            klog(LOG_INFO, "ELF: Loading segment");
+            klog(LOG_INFO, "ELF: PT_LOAD segment %d: vaddr=%x, memsz=%x, file_offset=%x", i, p_header->p_vaddr, p_header->p_memsz, p_header->p_offset);
             
-            // For now, we assume the virtual address is in userspace and not conflicting.
-            // We need to allocate physical memory and map it.
             uint64_t vaddr = p_header->p_vaddr;
             uint64_t mem_size = p_header->p_memsz;
             uint64_t file_size = p_header->p_filesz;
-            
+            uint64_t page_flags = PAGE_PRESENT | PAGE_USER;
+
+            if (p_header->p_flags & PF_W) {
+                page_flags |= PAGE_WRITE;
+            }
+            if (!(p_header->p_flags & PF_X)) { // If segment is not executable
+                page_flags |= PAGE_NO_EXEC;
+            }
+
             for (uint64_t j = 0; j < mem_size; j += PAGE_SIZE) {
                 void* phys_page = pmm_alloc_page();
                 if (!phys_page) {
-                    klog(LOG_ERROR, "ELF: Out of physical memory to load segment.");
-                    return 0;
+                    panic("ELF: Out of physical memory to load segment.", NULL);
                 }
-                // Map the page with user-accessible flags
-                vmm_map_page((void*)(vaddr + j), phys_page, PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
-            }
+                vmm_map_page(pml4, (void*)(vaddr + j), phys_page, page_flags);
 
-            // Copy data from ELF file to the new memory
-            memcpy((void*)vaddr, (void*)(elf_data + p_header->p_offset), file_size);
-            
-            // Zero out the BSS part of the segment
-            if (mem_size > file_size) {
-                memset((void*)(vaddr + file_size), 0, mem_size - file_size);
+                // Copy data if needed for this page
+                uint64_t offset_in_file = p_header->p_offset + j;
+                if (offset_in_file < p_header->p_offset + file_size) {
+                    uint64_t to_copy = PAGE_SIZE;
+                    if (p_header->p_offset + file_size - offset_in_file < to_copy) {
+                        to_copy = p_header->p_offset + file_size - offset_in_file;
+                    }
+                    void* src = (void*)(elf_data + offset_in_file);
+                    klog(LOG_DEBUG, "ELF: Copying %d bytes from %x to phys %x", to_copy, src, phys_page);
+                     // Use HHDM to access physical memory from kernel space
+                    memcpy(P_TO_V(phys_page), src, to_copy);
+                }
             }
         }
     }
 
     klog(LOG_INFO, "ELF: Segments loaded.");
     return header->e_entry;
+}
+
+int elf_exec_as_thread(const char* path) {
+    klog(LOG_INFO, "ELF Exec: Loading %s", path);
+    vfs_node_t* node = vfs_resolve_path(vfs_root, path);
+    if (!node) {
+        klog(LOG_ERROR, "ELF Exec: File not found");
+        return -1;
+    }
+    
+    klog(LOG_INFO, "ELF Exec: File found, size %d bytes", node->length);
+
+    uint8_t* buffer = kmalloc(node->length);
+    if (!buffer) {
+        klog(LOG_ERROR, "ELF Exec: Could not allocate buffer for file");
+        return -1;
+    }
+    
+    klog(LOG_INFO, "ELF Exec: Buffer allocated at %x", buffer);
+
+    vfs_read(node, 0, node->length, buffer);
+
+    klog(LOG_INFO, "ELF Exec: Calling vmm_create_address_space");
+    pml4_t* new_pml4 = vmm_create_address_space();
+    klog(LOG_INFO, "ELF Exec: vmm_create_address_space returned");
+    if (!new_pml4) {
+        klog(LOG_ERROR, "ELF Exec: Could not create new address space");
+        kfree(buffer);
+        return -1;
+    }
+
+    uint64_t entry_point = elf_load(new_pml4, buffer);
+    kfree(buffer);
+
+    if (entry_point) {
+        klog(LOG_INFO, "ELF Exec: Starting userspace thread at entry point %x", entry_point);
+        thread_create_userspace(entry_point, new_pml4);
+        return 0; // Success
+    }
+    
+    klog(LOG_ERROR, "ELF Exec: Failed to load ELF");
+    vmm_destroy_address_space(new_pml4);
+    return -1; // Failure
 }

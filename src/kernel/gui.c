@@ -93,7 +93,7 @@ void gui_draw_cursor() {
 
 void gui_update() {
     // This is a very inefficient redraw-all loop
-    fb_clear_screen(0xFF303080); // Desktop background color
+    fb_clear(0xFF303080); // Desktop background color
     
     for (int i = 0; i < num_windows; i++) {
         gui_draw_window(windows[i].title, windows[i].x, windows[i].y, windows[i].width, windows[i].height);

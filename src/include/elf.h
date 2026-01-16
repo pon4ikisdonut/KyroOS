@@ -2,6 +2,7 @@
 #define ELF_H
 
 #include <stdint.h>
+#include "vmm.h"
 
 #define EI_NIDENT 16
 
@@ -60,7 +61,14 @@ typedef struct {
 // p_type
 #define PT_LOAD 1 // Loadable segment
 
+// p_flags
+#define PF_X 1 // Execute
+#define PF_W 2 // Write
+#define PF_R 4 // Read
+
+
 // Function to load an ELF executable from memory
-int elf_load(const uint8_t* elf_data);
+int elf_load(pml4_t* pml4, const uint8_t* elf_data);
+int elf_exec_as_thread(const char* path);
 
 #endif // ELF_H

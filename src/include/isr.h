@@ -5,24 +5,34 @@
 
 // CPU state pushed onto the stack by the ISR stub
 struct registers {
-    uint64_t r15, r14, r13, r12, r11, r10, r9, r8;
-    uint64_t rbp, rdi, rsi, rdx, rcx, rbx, rax;
-    uint64_t int_no, err_code;
-    uint64_t rip, cs, rflags, rsp, ss;
+  uint64_t r15, r14, r13, r12, r11, r10, r9, r8;
+  uint64_t rbp, rdi, rsi, rdx, rcx, rbx, rax;
+  uint64_t int_no, err_code;
+  uint64_t rip, cs, rflags, rsp, ss;
 };
 
-void isr_handler(struct registers regs);
+void isr_handler(struct registers *regs);
+void timer_init(uint32_t frequency);
+uint64_t timer_get_ticks();
 
 // IRQ handlers
-typedef void (*irq_handler_t)(struct registers);
+typedef void (*irq_handler_t)(struct registers *regs);
 void register_irq_handler(uint8_t irq, irq_handler_t handler);
 
-static inline void enable_interrupts() {
-    __asm__ __volatile__("sti");
+static inline void enable_interrupts() { __asm__ __volatile__("sti"); }
+
+static inline void disable_interrupts() { __asm__ __volatile__("cli"); }
+
+static inline uint64_t read_cr2() {
+    uint64_t val;
+    __asm__ __volatile__("mov %%cr2, %0" : "=r"(val));
+    return val;
 }
 
-static inline void disable_interrupts() {
-    __asm__ __volatile__("cli");
+static inline uint64_t read_cr3() {
+    uint64_t val;
+    __asm__ __volatile__("mov %%cr3, %0" : "=r"(val));
+    return val;
 }
 
 #endif // ISR_H

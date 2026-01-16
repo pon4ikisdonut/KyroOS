@@ -28,9 +28,31 @@ static inline void outl(uint16_t port, uint32_t val) {
 }
 
 static inline uint32_t inl(uint16_t port) {
+
     uint32_t ret;
+
     __asm__ __volatile__ ("inl %1, %0" : "=a"(ret) : "Nd"(port));
+
     return ret;
+
 }
+
+
+
+static inline void insw(uint16_t port, void *addr, uint32_t count) {
+
+    __asm__ __volatile__ ("rep insw" : "+D"(addr), "+c"(count) : "d"(port) : "memory");
+
+}
+
+
+
+static inline void outsw(uint16_t port, const void *addr, uint32_t count) {
+
+    __asm__ __volatile__ ("rep outsw" : "+S"(addr), "+c"(count) : "d"(port));
+
+}
+
+
 
 #endif // PORT_IO_H

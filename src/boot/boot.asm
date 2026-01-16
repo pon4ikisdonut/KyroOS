@@ -1,178 +1,42 @@
-;
-; KyroOS x86_64 Boot Assembly
-; This file contains the initial 32-bit boot code, transitions to 64-bit long mode.
-;
+; KyroOS Limine Entry Point
+; This file sets up the stack and passes control to the C kernel.
 default rel
+bits 64
 
-KERNEL_VIRTUAL_BASE equ 0xFFFFFFFF80000000
-KERNEL_PHYSICAL_BASE equ 0x100000 ; 1MB
-
-section .multiboot_header
-header_start:
-    dd 0xe85250d6
-    dd 0
-    dd header_end - header_start
-    dd 0x100000000 - (0xe85250d6 + 0 + (header_end - header_start))
-    
-    ; Framebuffer tag
-    dw 5
-    dw 0
-    dd 20
-    dd 1024  ; width
-    dd 768   ; height
-    dd 32    ; bpp
-
-    ; End tag
-    dw 0, 0, 8
-header_end:
-
-section .boot_data
-align 8
-boot_gdt:
-    dq 0 ; Null segment
-    dq 0x00AF9A000000FFFF ; 64-bit Code Segment (Selector 0x08)
-    dq 0x00CF92000000FFFF ; 64-bit Data Segment (Selector 0x10)
-.end:
-boot_gdt_ptr:
-    dw boot_gdt.end - boot_gdt - 1
-    dq boot_gdt
-
-section .boot_bss nobits
+section .bss
 align 4096
-kernel_stack: resb 8192
-kernel_stack_top:
+stack:
+    resb 16384
+stack_top:
 
-; Paging structures
+global pml4
 align 4096
-pml4: resb 4096
-pdpt_low: resb 4096
-pdpt_high: resb 4096
-pd_low: resb 4096
-pd_high: resb 4096
+pml4:
+    resb 4096
 
+section .text
 global _start
 extern kmain_x64
 
-section .boot_text
-bits 32
-
 _start:
-    ; Clean up segment registers
-    xor eax, eax
-    mov ds, ax
-    mov es, ax
-    mov ss, ax
+    ; Hardware-level Serial Debug: Write '!' to COM1 immediately
+    mov dx, 0x3F8
+    mov al, '!'
+    out dx, al
 
-    ; --- Setup Paging for Higher-Half Kernel ---
-    ; Clear paging structures (5 pages = 20KB)
-    mov edi, pml4
-    mov ecx, 5120 ; 5 * 4096 / 4 = 5120 dwords
-    xor eax, eax
-    rep stosd
-
-    ; Map first 1GB identity (512 * 2MB = 1GB)
-    mov edi, pd_low
-    mov ecx, 512
-    mov ebx, 0x0
+    ; No arguments are passed in registers for Limine protocol.
+    ; All info is in the static request structures.
     
-.map_low_1gb:
-    mov eax, ebx
-    or eax, 0x83 ; Present, R/W, PS (Page Size = 2MB)
-    mov dword [edi], eax
-    mov dword [edi + 4], 0
-    
-    add ebx, 0x200000 ; Next 2MB frame
-    add edi, 8
-    loop .map_low_1gb
+    cli ; Disable interrupts immediately
 
-    ; Link paging structures for low memory
-    mov eax, pdpt_low
-    or eax, 0x3 ; Present, R/W
-    mov dword [pml4], eax
-    mov dword [pml4 + 4], 0
+    ; Set up the stack.
+    mov rsp, stack_top
 
-    mov eax, pd_low
-    or eax, 0x3
-    mov dword [pdpt_low], eax
-    mov dword [pdpt_low + 4], 0
+    ; Call the C entry point.
+    call kmain_x64
 
-    ; Map kernel to higher half
-    mov eax, pdpt_high
-    or eax, 0x3
-    mov dword [pml4 + 511*8], eax
-    mov dword [pml4 + 511*8 + 4], 0
-
-    mov eax, pd_high
-    or eax, 0x3
-    mov dword [pdpt_high + 510*8], eax
-    mov dword [pdpt_high + 510*8 + 4], 0
-    
-    ; Map kernel physical memory (256 * 2MB = 512MB)
-    mov edi, pd_high
-    mov ecx, 256
-    mov ebx, KERNEL_PHYSICAL_BASE
-    
-.map_kernel:
-    mov eax, ebx
-    or eax, 0x83 ; Present, R/W, PS
-    mov dword [edi], eax
-    mov dword [edi + 4], 0
-    
-    add ebx, 0x200000
-    add edi, 8
-    loop .map_kernel
-        
-    ; --- Enable Long Mode ---
-    mov eax, cr4
-    or eax, 1 << 5 ; PAE
-    mov cr4, eax
-    
-    mov eax, pml4
-    mov cr3, eax
-
-    mov ecx, 0xC0000080 ; EFER MSR
-    rdmsr
-    or eax, 1 << 8 ; LME
-    wrmsr
-
-    mov eax, cr0
-    or eax, (1 << 31) | (1 << 0) ; PG and PE
-    mov cr0, eax
-
-    lgdt [boot_gdt_ptr]
-    
-    ; Jump to 64-bit code
-    jmp 0x08:long_mode_start
-
-bits 64
-long_mode_start:
-    ; Reload segment registers
-    mov ax, 0x10
-    mov ss, ax
-    mov ds, ax
-    mov es, ax
-    xor rax, rax
-    mov fs, rax
-    mov gs, rax
-
-    ; Set up stack
-    mov rsp, kernel_stack_top
-
-    ; Call kernel main
-    ; RDI = multiboot magic (from EAX)
-    ; RSI = multiboot info (from EBX)
-    xor rdi, rdi
-    mov edi, eax
-    xor rsi, rsi
-    mov esi, ebx
-    
-    ; Use absolute addressing to call kmain_x64
-    mov rax, kmain_x64
-    call rax
-
-hang_loop:
+    ; If the kernel returns, hang.
+hang:
     cli
     hlt
-    jmp hang_loop
-
-section .note.GNU-stack noalloc noexec nowrite progbits
+    jmp hang

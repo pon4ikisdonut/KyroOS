@@ -1,6 +1,6 @@
-#ifndef KYROS_MATH_H
-#define KYROS_MATH_H
+#ifndef KYROOS_MATH_H
+#define KYROOS_MATH_H
 
 double sin(double x);
 
-#endif // KYROS_MATH_H
+#endif // KYROOS_MATH_H

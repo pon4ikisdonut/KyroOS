@@ -4,7 +4,7 @@
 #include "log.h"
 #include "heap.h"
 #include "kstring.h" // For memcpy, memset
-
+// debian users, dont text me pls
 static uint16_t icmp_echo_id = 0;
 static uint16_t icmp_echo_sequence = 0;
 
@@ -65,7 +65,11 @@ void icmp_handle_packet(net_dev_t* net_dev, const ipv4_header_t* ip_hdr, const u
 
     const icmp_header_t* icmp_hdr = (const icmp_header_t*)payload;
     
-    // Verify checksum (TODO: Implement checksum verification)
+    // Verify checksum
+    if (icmp_checksum(payload, payload_size) != 0) {
+        klog(LOG_WARN, "ICMP: Invalid checksum.");
+        return;
+    }
     
     switch (icmp_hdr->type) {
         case ICMP_ECHO_REQUEST: {

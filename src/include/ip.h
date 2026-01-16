@@ -27,7 +27,10 @@ typedef struct ipv4_header {
 #define IP_PROTOCOL_UDP  0x11
 
 void ip_init();
-uint32_t ip_get_local_ip(); // New function declaration
+uint32_t ip_get_local_ip();
+void ip_set_local_ip(uint32_t ip);
+void ip_set_subnet_mask(uint32_t mask);
+void ip_set_default_gateway(uint32_t gateway);
 void ip_handle_packet(net_dev_t* net_dev, const uint8_t* packet, size_t size);
 void ip_send_packet(net_dev_t* net_dev, uint32_t dest_ip, uint8_t protocol, const uint8_t* payload, size_t payload_size);
 

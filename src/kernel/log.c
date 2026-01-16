@@ -1,144 +1,205 @@
 #include "log.h"
-#include "isr.h"
-#include "fb.h"
-#include "font.h"
+#include "port_io.h"
+#include "isr.h" // Include for timer_get_ticks
+#include "version.h"
 #include <stdint.h>
-#include "kstring.h" // For memcpy
+#include <stddef.h>
+#include <stdarg.h> // For va_list in klog
+#include "kstring.h" // For vksprintf
+#include "epstein.h"
+#include "fb.h" // For framebuffer operations
+#include "font.h" // For font dimensions and glyphs
+#include "panic_screen.h"
 
-// Console state for framebuffer
-static uint32_t console_x = 0;
-static uint32_t console_y = 0;
-static uint32_t fg_color = 0xFFFFFFFF; // White
-static uint32_t bg_color = 0x00101030; // Dark Blue
+// Default colors for framebuffer output
+#define FB_DEFAULT_FG_COLOR 0xFFFFFFFF // White
+#define FB_DEFAULT_BG_COLOR 0xFF00004A // Dark Blue
 
-// Helper for scrolling the framebuffer
-static void console_scroll() {
-    const fb_info_t* info = fb_get_info();
-    uint32_t line_size = info->pitch;
-    uint32_t scroll_height = info->height - FONT_HEIGHT;
-    
-    // Move all lines up by one character height
-    memcpy((void*)info->address, (void*)(info->address + scroll_height * line_size), (info->height - console_y -1 ) * line_size);
-    
-    // Clear the last line
-    uint32_t* last_line_start = (uint32_t*)(info->address + (info->height - FONT_HEIGHT) * line_size / sizeof(uint32_t));
-    for (uint32_t i = 0; i < (info->pitch * FONT_HEIGHT) / sizeof(uint32_t); i++) {
-        last_line_start[i] = bg_color;
+// Serial port constants
+#define COM1 0x3F8
+
+uint32_t console_x = 0;
+uint32_t console_y = 0;
+
+// Circular buffer for recent log messages
+static char log_history[LOG_HISTORY_SIZE][LOG_MESSAGE_MAX_LEN];
+static uint32_t log_history_idx = 0;
+static bool log_history_full = false;
+
+// --- Serial Functions ---
+
+static void serial_init() {
+    outb(COM1 + 1, 0x00); // Disable all interrupts
+    outb(COM1 + 3, 0x80); // Enable DLAB (set baud rate divisor)
+    outb(COM1 + 0, 0x03); // Set divisor to 3 (lo byte) 38400 baud
+    outb(COM1 + 1, 0x00); //                  (hi byte)
+    outb(COM1 + 3, 0x03); // 8 bits, no parity, one stop bit
+    outb(COM1 + 2, 0xC7); // Enable FIFO, clear them, with 14-byte threshold
+    outb(COM1 + 4, 0x0B); // IRQs enabled, RTS/DSR set
+}
+
+static void serial_putchar(char c) {
+    while ((inb(COM1 + 5) & 0x20) == 0); // Wait for transmitter to be empty
+    outb(COM1, c);
+}
+
+void serial_print(const char *s) {
+    while (*s) {
+        serial_putchar(*s++);
     }
 }
 
+void serial_print_hex(uint64_t n) {
+    char hex[] = "0123456789abcdef";
+    serial_print("0x");
+    for (int i = 60; i >= 0; i -= 4) {
+        serial_putchar(hex[(n >> i) & 0xf]);
+    }
+}
+
+// --- Framebuffer Text Output Functions ---
 
 void klog_putchar(char c) {
-    const fb_info_t* info = fb_get_info();
-    if (!info || !info->address) return; // Can't draw if framebuffer is not ready
+    const fb_info_t *fb_info = fb_get_info();
+    if (!fb_info) return; // Cannot draw if no framebuffer info
+
+    uint32_t max_console_x = fb_info->width / FONT_WIDTH;
+    uint32_t max_console_y = fb_info->height / FONT_HEIGHT;
 
     if (c == '\n') {
         console_x = 0;
         console_y++;
+    } else if (c == '\b') {
+        if (console_x > 0) {
+            console_x--;
+            fb_draw_char(' ', console_x * FONT_WIDTH, console_y * FONT_HEIGHT, FB_DEFAULT_FG_COLOR, FB_DEFAULT_BG_COLOR);
+        }
     } else {
-        fb_draw_char(c, console_x * FONT_WIDTH, console_y * FONT_HEIGHT, fg_color, bg_color);
+        fb_draw_char(c, console_x * FONT_WIDTH, console_y * FONT_HEIGHT, FB_DEFAULT_FG_COLOR, FB_DEFAULT_BG_COLOR);
         console_x++;
     }
 
-    if (console_x * FONT_WIDTH >= info->width) {
+    if (console_x >= max_console_x) {
         console_x = 0;
         console_y++;
     }
-    if (console_y * FONT_HEIGHT >= info->height) {
-        console_scroll();
+
+    if (console_y >= max_console_y) {
+        // Scroll up: Copy region from FONT_HEIGHT to (max_console_y - 1) * FONT_HEIGHT
+        fb_copy_region(FONT_HEIGHT, 0, (max_console_y - 1) * FONT_HEIGHT);
+        // Clear the last line
+        fb_draw_rect(0, (max_console_y - 1) * FONT_HEIGHT, fb_info->width, FONT_HEIGHT, FB_DEFAULT_BG_COLOR);
+        console_y = max_console_y - 1;
     }
 }
 
-void klog_print_str(const char* str) {
-    for (size_t i = 0; str[i] != '\0'; i++) {
-        klog_putchar(str[i]);
+void klog_print_str(const char *s) {
+    while (*s) {
+        klog_putchar(*s++);
     }
 }
 
-void klog_print_hex(uint64_t val) {
-    char hex_chars[] = "0123456789ABCDEF";
-    char buffer[19] = "0x";
-    int i = 17;
-    buffer[18] = '\0';
-
-    if (val == 0) {
-        buffer[2] = '0';
-        buffer[3] = '\0';
-        klog_print_str(buffer);
-        return;
-    }
-    
-    while (val > 0) {
-        buffer[i--] = hex_chars[val % 16];
-        val /= 16;
-    }
-    klog_print_str(&buffer[i + 1]);
+void console_clear(void) {
+    fb_clear(FB_DEFAULT_BG_COLOR);
+    console_x = 0;
+    console_y = 0;
 }
+
+void panic(const char *message, struct registers *regs) {
+    // First, log the panic message to the serial port for debugging.
+    serial_print("\n--- KERNEL PANIC ---\n");
+    serial_print("Message: ");
+    serial_print(message);
+    serial_print("\n");
+
+    // Now, display the full graphical panic screen.
+    panic_screen_show(message, regs);
+
+    // The panic_screen_show function should not return, but as a fallback,
+    // ensure the system halts completely.
+    for (;;) {
+        __asm__ __volatile__("cli; hlt");
+    }
+}
+
+// --- Stub/Init Functions ---
 
 void log_init() {
-    console_x = 0;
-    console_y = 0;
-    // Clearing of screen is now handled in fb_init
+    serial_init();
+    // No need to clear framebuffer here, kernel.c will do fb_init and console_clear
 }
 
-void klog(log_level_t level, const char* message) {
-    uint32_t old_fg = fg_color;
-    
-    switch (level) {
-        case LOG_INFO:
-            fg_color = 0xFFFFFFFF; // White
-            klog_print_str("[INFO] ");
-            break;
-        case LOG_WARN:
-            fg_color = 0xFFFFFF00; // Yellow
-            klog_print_str("[WARN] ");
-            break;
-        case LOG_ERROR:
-            fg_color = 0xFFFF0000; // Red
-            klog_print_str("[ERROR] ");
-            break;
-        case LOG_PANIC:
-            fg_color = 0xFFFFFFFF; // White on Red
-            bg_color = 0xFFFF0000;
-            klog_print_str("[PANIC] ");
-            break;
+// --- klog implementation using vsprintf ---
+void klog(log_level_t level, const char *fmt, ...) {
+    char log_buffer[LOG_MESSAGE_MAX_LEN]; // Temporary buffer for formatted log messages
+    va_list args;
+
+    va_start(args, fmt);
+    int len = vksprintf(log_buffer, fmt, args);
+    va_end(args);
+
+    // Ensure null termination in case vksprintf overfills (though it shouldn't with correct size)
+    if (len >= sizeof(log_buffer)) {
+        log_buffer[sizeof(log_buffer) - 1] = '\0';
+    } else {
+        log_buffer[len] = '\0';
     }
     
-    klog_print_str(message);
-    klog_putchar('\n');
-    fg_color = old_fg;
-    if(level == LOG_PANIC) bg_color = 0x00101030; // Reset bg color
+    // Store in circular buffer
+    strncpy(log_history[log_history_idx], log_buffer, LOG_MESSAGE_MAX_LEN - 1);
+    log_history[log_history_idx][LOG_MESSAGE_MAX_LEN - 1] = '\0'; // Ensure null termination
+    log_history_idx++;
+    if (log_history_idx >= LOG_HISTORY_SIZE) {
+        log_history_idx = 0;
+        log_history_full = true;
+    }
+
+
+    // Output to serial
+    serial_print("[");
+    switch(level) {
+        case LOG_INFO: serial_print("INFO"); break;
+        case LOG_WARN: serial_print("WARN"); break;
+        case LOG_ERROR: serial_print("ERROR"); break;
+        case LOG_DEBUG: serial_print("DEBUG"); break; // Treat DEBUG as INFO for now
+        default: serial_print("UNKNOWN"); break;
+    }
+    serial_print("] ");
+    serial_print(log_buffer);
+    serial_print("\n");
+
+    // Output to framebuffer
+    klog_print_str("[");
+    switch(level) {
+        case LOG_INFO: klog_print_str("INFO"); break;
+        case LOG_WARN: klog_print_str("WARN"); break;
+        case LOG_ERROR: klog_print_str("ERROR"); break;
+        case LOG_DEBUG: klog_print_str("DEBUG"); break; // Treat DEBUG as INFO for now
+        default: klog_print_str("UNKNOWN"); break;
+    }
+    klog_print_str("] ");
+    klog_print_str(log_buffer);
+    klog_print_str("\n");
 }
 
-void panic(const char* message, struct registers* regs) {
-    disable_interrupts(); // Critical: disable interrupts during panic
-
-    uint32_t old_bg = bg_color;
-    bg_color = 0xFF800000; // Dark Red background
-    fg_color = 0xFFFFFFFF; // White text
-    
-    fb_clear_screen(bg_color);
-    console_x = 0;
-    console_y = 0;
-
-    klog_print_str("!!! KERNEL PANIC !!!\n"); // Linus Torvalds, hello, when will you add beautiful panic screens?
-    klog_print_str("Message: ");
-    klog_print_str(message);
-    klog_putchar('\n');
-
-    if (regs) {
-        klog_print_str("Interrupt: "); klog_print_hex(regs->int_no); klog_putchar('\n');
-        klog_print_str("Error Code: "); klog_print_hex(regs->err_code); klog_putchar('\n');
-        klog_print_str("RIP: "); klog_print_hex(regs->rip); klog_putchar('\n');
-        klog_print_str("CS: "); klog_print_hex(regs->cs); klog_putchar('\n');
-        klog_print_str("RFLAGS: "); klog_print_hex(regs->rflags); klog_putchar('\n');
-        klog_print_str("RSP: "); klog_print_hex(regs->rsp); klog_putchar('\n');
-        klog_print_str("SS: "); klog_print_hex(regs->ss); klog_putchar('\n');
+void log_get_entries(char* entries, int* count, int num_to_get) {
+    if (!entries || !count || num_to_get <= 0) {
+        if (count) *count = 0;
+        return;
     }
 
-    // Halt the CPU indefinitely
-    for (;;) {
-        __asm__ __volatile__ ("hlt");
+    int num_available = log_history_full ? LOG_HISTORY_SIZE : log_history_idx;
+    int num_to_copy = (num_to_get > num_available) ? num_available : num_to_get;
+    *count = num_to_copy;
+
+    int start_index = (log_history_idx - num_to_copy + LOG_HISTORY_SIZE) % LOG_HISTORY_SIZE;
+
+    for (int i = 0; i < num_to_copy; i++) {
+        int history_i = (start_index + i) % LOG_HISTORY_SIZE;
+        
+        char* dest = entries + (i * LOG_MESSAGE_MAX_LEN);
+        char* src = log_history[history_i];
+        strncpy(dest, src, LOG_MESSAGE_MAX_LEN - 1);
+        dest[LOG_MESSAGE_MAX_LEN - 1] = '\0'; // Ensure null termination
     }
-    bg_color = old_bg; // Will never be reached
 }

@@ -1,6 +1,6 @@
-#include "../lib/kyros_gfx/kyros_gfx.h"
+#include "../lib/kyroos_gfx/kyroos_gfx.h"
 
-void _start() {
+int main() {
     if (gfx_init() != 0) {
         // Failed to init graphics, hang
         for(;;);
