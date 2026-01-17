@@ -18,8 +18,8 @@ KyroOS is an experimental 64-bit operating system for the x86-64 architecture, d
 ## System Requirements
 
 *   **CPU:** x86-64 compatible processor.
-*   **RAM:** Minimum 64 MB.
-*   **Storage:** Minimum 100 MB for installation.
+*   **RAM:** Minimum 24 MB.
+*   **Storage:** Minimum 100 MB flash drive (The installation of the system will be fully implemented in the future)
 *   **Boot:** BIOS or UEFI firmware.
 
 ## Quick Build Overview
@@ -36,39 +36,9 @@ KyroOS is built using a standard GNU toolchain (GCC, Make, NASM, xorriso). It ca
     make all
     ```
     This will compile the kernel and userspace programs, and create `kyroos.iso`.
-
-## Installation Overview
-
-KyroOS installation is currently a manual process involving two main stages:
-1.  Booting from the `kyroos.iso` to run the built-in installer.
-2.  Manually installing and configuring the Limine bootloader on your target disk.
-
-Refer to the full `[Installation Guide](docs/install.md)` for detailed steps.
-
 ## Documentation
 
-The full documentation for KyroOS can be found in the `docs/` directory.
-
-*   [Overview](docs/overview.md)
-*   [Build Instructions](docs/build.md)
-*   [Installation Guide](docs/install.md)
-*   [Boot Process](docs/boot.md)
-*   [Kernel Architecture](docs/kernel.md)
-*   [Memory Management](docs/memory.md)
-*   [Scheduler](docs/scheduler.md)
-*   [Device Drivers](docs/drivers.md)
-*   [Filesystem](docs/filesystem.md)
-*   [Userspace](docs/userspace.md)
-*   [KyroOS Shell](docs/shell.md)
-*   [Core Utilities](docs/coreutils.md)
-*   [Package Manager (kpm)](docs/kpm.md)
-*   [Installer](docs/installer.md)
-*   [Security](docs/security.md)
-*   [Debugging](docs/debug.md)
-*   [Kernel Panics](docs/kernel_panics.md)
-*   [Versioning](docs/versioning.md)
-*   [FAQ](docs/faq.md)
-*   [**Unified Manual (all.md)**](docs/all.md)
+The full documentation for KyroOS can be found in the `docs_en/` or `docs_ru/` directory.
 
 ## Warning
 
