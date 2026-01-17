@@ -40,6 +40,29 @@ KyroOS is built using a standard GNU toolchain (GCC, Make, NASM, xorriso). It ca
 
 The full documentation for KyroOS can be found in the `docs_en/` or `docs_ru/` directory.
 
+### English Documentation
+
+*   [Porting Applications to KyroOS](docs_en/porting_applications.md)
+*   [Writing Applications for KyroOS](docs_en/writing_applications.md)
+
+## First Alpha Release (v0.1.0-alpha)
+
+This is the first official alpha release of KyroOS. While the system is still in a very early stage of development, we are making an ISO available for enthusiasts who want to try it out.
+
+**What to Expect:**
+
+*   The system boots to a graphical desktop environment.
+*   You can interact with the basic shell and run a few commands.
+*   The mouse, keyboard, and framebuffer drivers are functional.
+
+**Known Issues & Limitations:**
+
+*   **Installer is not functional:** You must run the OS from the ISO using a virtual machine (like QEMU or VirtualBox) or by burning it to a USB drive. Installation to a hard disk is not yet supported.
+*   **Package Manager (KPM) is not working:** The `kpm` utility is included but is currently non-operational.
+*   **High Instability:** The system is extremely raw and may crash or behave unexpectedly. Save your work in other OSes, not this one!
+
+You can find the ISO file on the [GitHub Releases](https://github.com/pon4ikisdonut/KyroOS/releases) page. We welcome feedback and bug reports!
+
 ## Warning
 
 KyroOS is under heavy development and is considered an **alpha** quality operating system. It is not stable, may contain significant bugs, and is not suitable for production use.
