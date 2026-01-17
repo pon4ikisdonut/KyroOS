@@ -1,6 +1,6 @@
 # KyroOS - A Modern x86-64 Operating System
 
-KyroOS is an experimental 64-bit operating system for the x86-64 architecture, developed as a learning project. It features a monolithic kernel designed for simplicity, readability, and extensibility.
+KyroOS is an 64-bit operating system for the x86-64 architecture, developed as a learning project. It features a monolithic kernel designed for simplicity, readability, and extensibility.
 
 ## Key Features
 
@@ -45,7 +45,12 @@ The full documentation for KyroOS can be found in the `docs_en/` or `docs_ru/` d
 *   [Porting Applications to KyroOS](docs_en/porting_applications.md)
 *   [Writing Applications for KyroOS](docs_en/writing_applications.md)
 
-## First Alpha Release (v0.1.0-alpha)
+### Русская Документация
+
+*   [Портирование Приложений на KyroOS](docs_ru/porting_applications.md)
+*   [Написание Приложений для KyroOS](docs_ru/writing_applications.md)
+
+## First Alpha Release (26.01.00 811)
 
 This is the first official alpha release of KyroOS. While the system is still in a very early stage of development, we are making an ISO available for enthusiasts who want to try it out.
 
@@ -53,7 +58,7 @@ This is the first official alpha release of KyroOS. While the system is still in
 
 *   The system boots to a graphical desktop environment.
 *   You can interact with the basic shell and run a few commands.
-*   The mouse, keyboard, and framebuffer drivers are functional.
+*   The keyboard, and framebuffer drivers are functional.
 
 **Known Issues & Limitations:**
 
